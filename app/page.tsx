@@ -18,6 +18,11 @@ type DailyLog = { id: number; date: string; is_completed: boolean; count: number
 type ProgressStats = { total: number; mastered: number; ranks: {learning:number, bronze:number, silver:number, gold:number}; weakWords: { word: string; meaning: string; mistakes: number }[]; checkWords: { id: number, word: string; meaning: string; }[]; recentLogs: DailyLog[]; graphData: any[]; pieData: any[] }
 type ChallengeSettings = { mode: 'manual' | 'auto'; selected_ids: number[]; auto_count: number; quest_count: number; special_quest_count: number; challenge_quest_count: number; reward_goal_days: number; reward_text: string; }
 
+// ★誤って消してしまっていた設定データを復活させました！
+const RICK_MESSAGES = ["あそぼ！...じゃなくて勉強だワン！", "くんくん...正解の匂いがするワン！", "かっこいい字だワン！🦴", "その調子だワン！散歩はその後だワン！", "Rickも応援してるワン！"]
+const DEFAULT_TIPS_BROTHER = ["ダイヤモンドはY座標-58付近で一番見つかるよ！", "エンダーマンは水が苦手だよ！", "松明は湧き潰しに重要だよ！"]
+const DEFAULT_TIPS_SISTER = ["リボンは手首のスナップをきかせると綺麗に回るよ！", "柔軟体操は毎日お風呂上がりにやると効果的！", "つま先までピンと伸ばすと姿勢が美しく見えるよ！"]
+
 const PIE_COLORS = ['#E5E7EB', '#CD7F32', '#C0C0C0', '#FFD700']
 const getJSTDateString = (dateObj: Date) => new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(dateObj).replace(/\//g, '-')
 const getTodayJST = () => getJSTDateString(new Date())
@@ -63,7 +68,6 @@ export default function Home() {
   const [message, setMessage] = useState(''); const [showRick, setShowRick] = useState(false); const [rickComment, setRickComment] = useState("頑張るワン！")
   const [mistakeCount, setMistakeCount] = useState(0); const [rewardTip, setRewardTip] = useState<string|null>(null); const [completeBonusTip, setCompleteBonusTip] = useState<string|null>(null)
   
-  // ★ 新規追加：間違えたときの情報を表示するためのステート
   const [feedbackMsg, setFeedbackMsg] = useState<React.ReactNode | null>(null)
   
   const [showHint, setShowHint] = useState(false); const [showFlashAnswer, setShowFlashAnswer] = useState(false); const [isTransitioning, setIsTransitioning] = useState(false)
@@ -394,7 +398,6 @@ export default function Home() {
     } else {
       playSound('wrong'); const nextMistakeCount = mistakeCount + 1; setMistakeCount(nextMistakeCount); setShowHint(true); setIsProcessing(false);
       
-      // ★ 追加：間違えた選択肢の読みをフィードバック表示
       if (inputMode === 'quiz') {
           const selectedWord = options.find(o => o.kanji === ans || formatReading(o.reading, o.okurigana) === ans || getFullReading(o.reading, o.okurigana) === ans);
           if (selectedWord && selectedWord.id !== cur.id) {
@@ -789,7 +792,6 @@ export default function Home() {
                           <div className="bg-sky-50 border-2 border-sky-200 rounded-3xl p-6 shadow-inner w-full"><h2 className="text-4xl font-black text-sky-800 mb-3">{renderReading(word.reading, word.okurigana)}</h2>{word.sentence && <p className="text-stone-600 font-bold text-lg bg-white py-2 px-4 rounded-xl shadow-sm border border-sky-100">{word.sentence.replace('□', '〇')}</p>}</div>
                       )}
                       
-                      {/* ★ 新規追加：間違えたときのフィードバック表示 */}
                       {feedbackMsg && (
                           <div className="mt-4 bg-rose-50 border-2 border-rose-200 text-stone-700 py-2 px-5 rounded-xl text-sm animate-in zoom-in slide-in-from-bottom-2 shadow-sm font-bold">
                               {feedbackMsg}
