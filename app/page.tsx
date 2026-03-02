@@ -18,7 +18,6 @@ type DailyLog = { id: number; date: string; is_completed: boolean; count: number
 type ProgressStats = { total: number; mastered: number; ranks: {learning:number, bronze:number, silver:number, gold:number}; weakWords: { word: string; meaning: string; mistakes: number }[]; checkWords: { id: number, word: string; meaning: string; }[]; recentLogs: DailyLog[]; graphData: any[]; pieData: any[] }
 type ChallengeSettings = { mode: 'manual' | 'auto'; selected_ids: number[]; auto_count: number; quest_count: number; special_quest_count: number; challenge_quest_count: number; reward_goal_days: number; reward_text: string; }
 
-// ★誤って消してしまっていた設定データを復活させました！
 const RICK_MESSAGES = ["あそぼ！...じゃなくて勉強だワン！", "くんくん...正解の匂いがするワン！", "かっこいい字だワン！🦴", "その調子だワン！散歩はその後だワン！", "Rickも応援してるワン！"]
 const DEFAULT_TIPS_BROTHER = ["ダイヤモンドはY座標-58付近で一番見つかるよ！", "エンダーマンは水が苦手だよ！", "松明は湧き潰しに重要だよ！"]
 const DEFAULT_TIPS_SISTER = ["リボンは手首のスナップをきかせると綺麗に回るよ！", "柔軟体操は毎日お風呂上がりにやると効果的！", "つま先までピンと伸ばすと姿勢が美しく見えるよ！"]
@@ -276,6 +275,12 @@ export default function Home() {
           setAllWordsList(prev => prev.map(w => w.id === wordId ? { ...w, currentStatus: 'gold' } : w));
       }
       fetchAdminStats(adminTargetUser.id);
+  }
+
+  const saveChallengeSettings = async (newSettings: ChallengeSettings) => {
+    setChallengeSettings(newSettings)
+    await supabase.from('challenge_settings').upsert({ target_user_id: adminTargetUser.id, mode: newSettings.mode, selected_ids: newSettings.selected_ids, auto_count: newSettings.auto_count, quest_count: newSettings.quest_count, special_quest_count: newSettings.special_quest_count, challenge_quest_count: newSettings.challenge_quest_count, reward_goal_days: newSettings.reward_goal_days, reward_text: newSettings.reward_text, updated_at: new Date().toISOString() }, { onConflict: 'target_user_id' });
+    alert('設定を保存しました！🔥');
   }
 
   const startGame = async (selectedMode: 'daily' | 'free' | 'weekend' | 'parent_challenge' | 'rick_challenge' | 'revenge') => {
