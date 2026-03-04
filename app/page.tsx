@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import confetti from 'canvas-confetti'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Label } from 'recharts'
@@ -9,10 +9,18 @@ const USERS = [
   { id: 'sister', name: 'みのり (小3)', color: 'bg-sky-500', light: 'bg-sky-50', border: 'border-sky-500', text: 'text-sky-700', hue: 'from-sky-400 to-indigo-500', defaultTipTable: 'school_tips' }
 ]
 
-const CATEGORIES = [{ id: 'general', name: 'その他' }, { id: 'grade1', name: '小1レベル (10級)' }, { id: 'grade2', name: '小2レベル (9級)' }, { id: 'grade3', name: '小3レベル (8級)' }, { id: 'grade4', name: '小4レベル (7級)' }, { id: 'grade5', name: '小5レベル (6級)' }, { id: 'grade6', name: '小6レベル (5級)' }, { id: 'middle', name: '中学レベル (4級~)' }]
+// 漢検レベル10級〜1級に対応
+const CATEGORIES = [
+  { id: 'kyu10', name: '10級(小1)' }, { id: 'kyu9', name: '9級(小2)' }, { id: 'kyu8', name: '8級(小3)' }, 
+  { id: 'kyu7', name: '7級(小4)' }, { id: 'kyu6', name: '6級(小5)' }, { id: 'kyu5', name: '5級(小6)' }, 
+  { id: 'kyu4', name: '4級(中学)' }, { id: 'kyu3', name: '3級(中学)' }, { id: 'kyu_pre2', name: '準2級(高校)' }, 
+  { id: 'kyu2', name: '2級(高校・一般)' }, { id: 'kyu_pre1', name: '準1級(大学・一般)' }, { id: 'kyu1', name: '1級(大学・一般)' }, 
+  { id: 'general', name: 'その他' }
+]
+
 const MODE_NAMES: Record<string, string> = { daily: '🚀 今日の冒険', free: '⚔️ フリー', weekend: '🏰 週末ボス', parent_challenge: '🔥 パパ挑戦状', rick_challenge: '⚡ Rick挑戦', revenge: '💀 リベンジ' }
 
-type KanjiWord = { id: number; kanji: string; reading: string; okurigana: string | null; sentence: string; emoji: string; category: string; stroke_count: number | null; stroke_data_url: string | null; usage_example?: string | null; origin_logic?: string | null; riskScore?: number; target_user?: string }
+type KanjiWord = { id: number; kanji: string; reading: string; okurigana: string | null; sentence: string; emoji: string; category: string; kanji_level?: string | null; stroke_count: number | null; stroke_data_url: string | null; usage_example?: string | null; origin_logic?: string | null; riskScore?: number; target_user?: string }
 type ActivityLog = { time: string, word: string, mode: string, result: 'correct' | 'incorrect' | 'done' }
 type DailyLog = { id: number; date: string; is_completed: boolean; count: number; child_comment?: string; parent_reply?: string; streak?: number; details?: ActivityLog[] }
 type ProgressStats = { total: number; mastered: number; ranks: {learning:number, bronze:number, silver:number, gold:number}; weakWords: { word: string; meaning: string; mistakes: number }[]; checkWords: { id: number, word: string; meaning: string; }[]; recentLogs: DailyLog[]; graphData: any[]; pieData: any[] }
@@ -45,12 +53,17 @@ export default function Home() {
   const [view, setView] = useState<'menu'|'game'|'rick_challenge'|'result'|'admin'|'collection'>('menu')
   const [mode, setMode] = useState<'daily'|'free'|'weekend'|'parent_challenge'|'rick_challenge'|'revenge'>('daily')
   const [loading, setLoading] = useState(false); const [comparison, setComparison] = useState({ thisWeek: 0, lastWeek: 0 })
-  const [selectedInputMode, setSelectedInputMode] = useState<'quiz_kanji'|'typing_read'>('quiz_kanji')
-  const [collectionTab, setCollectionTab] = useState('general'); const [flashcardMode, setFlashcardMode] = useState<'normal'|'hide_kanji'|'hide_reading'>('normal')
+  
+  // ★ 漢検レベルと入力モードの選択ステート
+  const [targetKyu, setTargetKyu] = useState<string>('all')
+  const [selectedInputMode, setSelectedInputMode] = useState<'quiz_kanji'|'typing_read'|'write_canvas'|'write_self'>('quiz_kanji')
+  
+  const [rickMode, setRickMode] = useState<'read'|'think'|'write'>('read')
+  const [collectionTab, setCollectionTab] = useState('kyu10'); const [flashcardMode, setFlashcardMode] = useState<'normal'|'hide_kanji'|'hide_reading'>('normal')
   const [revealedCards, setRevealedCards] = useState<number[]>([]); const [reviewRevealed, setReviewRevealed] = useState<number[]>([])
   
   const [adminTab, setAdminTab] = useState<'stats'|'challenge'|'add_word'|'add_tip'|'manage'>('stats'); const [adminTargetUser, setAdminTargetUser] = useState(USERS[0])
-  const [newWord, setNewWord] = useState({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: 'general', stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' })
+  const [newWord, setNewWord] = useState({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: 'kyu10', stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' })
   const [newTip, setNewTip] = useState(''); const [tipType, setTipType] = useState<'brother'|'sister'>('brother')
   const [allWordsList, setAllWordsList] = useState<any[]>([]); const [showAllWeakWords, setShowAllWeakWords] = useState(false)
   const [selectedLogDate, setSelectedLogDate] = useState<string|null>(null); const [editStreak, setEditStreak] = useState(0)
@@ -63,19 +76,64 @@ export default function Home() {
   const [collectionData, setCollectionData] = useState<any>({ gold: [], silver: [], bronze: [], learning: [] }); const [reviewCandidates, setReviewCandidates] = useState<KanjiWord[]>([])
   const [rickStep, setRickStep] = useState<0|1|2>(0); const [weekendPhase, setWeekendPhase] = useState<1|2|3>(1); const [weekendTips, setWeekendTips] = useState<string[]>([])
   
+  // 手書き・自己判定モード用
+  const [gameStep, setGameStep] = useState<0|1>(0)
+
   const [bossHp, setBossHp] = useState(10); const [isBossAttacked, setIsBossAttacked] = useState(false); const [userAnswer, setUserAnswer] = useState('')
   const [message, setMessage] = useState(''); const [showRick, setShowRick] = useState(false); const [rickComment, setRickComment] = useState("頑張るワン！")
   const [mistakeCount, setMistakeCount] = useState(0); const [rewardTip, setRewardTip] = useState<string|null>(null); const [completeBonusTip, setCompleteBonusTip] = useState<string|null>(null)
   
   const [feedbackMsg, setFeedbackMsg] = useState<React.ReactNode | null>(null)
-  
   const [showHint, setShowHint] = useState(false); const [showFlashAnswer, setShowFlashAnswer] = useState(false); const [isTransitioning, setIsTransitioning] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false); const [childCommentInput, setChildCommentInput] = useState(''); const [parentReplyInput, setParentReplyInput] = useState('')
   const [editingLogId, setEditingLogId] = useState<number|null>(null); const [langMode, setLangMode] = useState<'kanji_to_read'|'read_to_kanji'>('read_to_kanji')
-  const [inputMode, setInputMode] = useState<'quiz'|'typing'>('quiz'); const [options, setOptions] = useState<KanjiWord[]>([])
+  const [inputMode, setInputMode] = useState<'quiz'|'typing'|'canvas'|'self'>('quiz'); const [options, setOptions] = useState<KanjiWord[]>([])
+  const [isListening, setIsListening] = useState(false)
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  useEffect(() => {
+    if (((view === 'rick_challenge' && rickMode === 'write') || (view === 'game' && inputMode === 'canvas')) && canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) { ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 6; ctx.strokeStyle = '#333'; }
+    }
+  }, [view, rickMode, inputMode, currentIndex, rickStep, gameStep]);
+
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+      setIsDrawing(true); const { offsetX, offsetY } = e.nativeEvent; const ctx = canvasRef.current?.getContext('2d');
+      if (ctx) { ctx.beginPath(); ctx.moveTo(offsetX, offsetY); }
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+      if (!isDrawing) return; const { offsetX, offsetY } = e.nativeEvent; const ctx = canvasRef.current?.getContext('2d');
+      if (ctx) { ctx.lineTo(offsetX, offsetY); ctx.stroke(); }
+  };
+  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+      setIsDrawing(false); const ctx = canvasRef.current?.getContext('2d');
+      if (ctx) ctx.closePath();
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  };
+  const clearCanvas = () => {
+      const canvas = canvasRef.current; const ctx = canvas?.getContext('2d');
+      if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
 
   const playSound = (type: 'correct'|'wrong'|'clear') => { const audio = new Audio(`/sounds/${type}.mp3`); audio.volume = 0.5; audio.play().catch(e=>console.log(e)); }
   const speakWord = (text: string) => { stopSpeaking(); const u = new SpeechSynthesisUtterance(text); u.lang = 'ja-JP'; speechSynthesis.speak(u); }
+
+  const startListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert("お使いのブラウザはマイク入力に対応していません🐶💦 SafariやChromeの最新版を使ってね！"); return; }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = false; recognition.maxAlternatives = 1;
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onresult = (event: any) => { const transcript = event.results[0][0].transcript; setUserAnswer(transcript); checkAnswer(transcript, true); };
+    recognition.onerror = (event: any) => { console.error('Speech recognition error', event.error); setIsListening(false); if(event.error === 'not-allowed') alert('マイクの使用が許可されていません！ブラウザの設定を確認してね🐶'); };
+    recognition.start();
+  }
 
   useEffect(() => {
     const handleVisibilityChange = () => { if (document.visibilityState === 'visible') { checkDailyProgress(); checkChallengeStatus(); fetchMonthlyLogs(calendarDate); } };
@@ -156,10 +214,11 @@ export default function Home() {
     const ranks = { learning: 0, bronze: 0, silver: 0, gold: 0 }; let weakWordsList: any[] = []; let checkWordsList: any[] = [];
 
     progress?.forEach((p: any) => {
+        const wordData = p.kanji_questions;
         if (p.status === 'mastered' || p.status === 'gold') {
-            ranks.gold++; if (!p.is_writing_master && p.kanji_questions) checkWordsList.push({ id: p.question_id, word: p.kanji_questions.kanji, meaning: getFullReading(p.kanji_questions.reading, p.kanji_questions.okurigana) });
+            ranks.gold++; if (!p.is_writing_master && wordData) checkWordsList.push({ id: p.question_id, word: wordData.kanji, meaning: getFullReading(wordData.reading, wordData.okurigana) });
         } else if (p.status === 'silver') ranks.silver++; else if (p.status === 'bronze') ranks.bronze++; else ranks.learning++;
-        if (p.mistake_count > 0 && p.kanji_questions) weakWordsList.push({ word: p.kanji_questions.kanji, meaning: getFullReading(p.kanji_questions.reading, p.kanji_questions.okurigana), mistakes: p.mistake_count });
+        if (p.mistake_count > 0 && wordData) weakWordsList.push({ word: wordData.kanji, meaning: getFullReading(wordData.reading, wordData.okurigana), mistakes: p.mistake_count });
     });
 
     ranks.learning = Math.max(0, (total || 0) - ranks.gold - ranks.silver - ranks.bronze); weakWordsList.sort((a, b) => b.mistakes - a.mistakes);
@@ -245,8 +304,10 @@ export default function Home() {
   const handleAddWord = async () => { 
       if (!newWord.kanji || !newWord.reading) return alert("必須だワン！"); 
       setLoading(true); 
+      // ★ 漢検レベル（kanji_level）にも同じカテゴリの値をセットする
       const payload = { 
           ...newWord, 
+          kanji_level: newWord.category,
           target_user: adminTargetUser.id, 
           stroke_count: newWord.stroke_count ? parseInt(newWord.stroke_count) : null,
           usage_example: newWord.usage_example || null,
@@ -254,11 +315,11 @@ export default function Home() {
       };
       await supabase.from('kanji_questions').insert([payload]); 
       setLoading(false); alert(`${adminTargetUser.name.split(' ')[0]}用に追加したワン！`); 
-      setNewWord({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: 'general', stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' });
+      setNewWord({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: 'kyu10', stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' });
       fetchAllWordsForEdit();
   }
   
-  const handleUpdateCategory = async (id: number, newCategory: string) => { await supabase.from('kanji_questions').update({ category: newCategory }).eq('id', id); setAllWordsList(allWordsList.map(w => w.id === id ? { ...w, category: newCategory } : w)); }
+  const handleUpdateCategory = async (id: number, newCategory: string) => { await supabase.from('kanji_questions').update({ category: newCategory, kanji_level: newCategory }).eq('id', id); setAllWordsList(allWordsList.map(w => w.id === id ? { ...w, category: newCategory, kanji_level: newCategory } : w)); }
   const handleDeleteWord = async (id: number) => { if (!confirm('削除しますか？')) return; await supabase.from('kanji_questions').delete().eq('id', id); setAllWordsList(allWordsList.filter(w => w.id !== id)); }
   const handleAddTip = async () => { if (!newTip) return; const table = tipType === 'brother' ? 'minecraft_tips' : 'school_tips'; await supabase.from(table).insert([{ content: newTip }]); alert('追加！'); setNewTip('') }
   const handleParentChallengeUpdate = async (id: number) => {
@@ -296,24 +357,38 @@ export default function Home() {
     setCurrentGameGoal(QUEST_LIMIT);
 
     if (selectedMode === 'weekend') { setWeekendPhase(1); setWeekendTips([]); setBossHp(QUEST_LIMIT); } 
-    if (selectedMode === 'rick_challenge') {
-        const { data: allWords } = await supabase.from('kanji_questions').select('*').eq('target_user', currentUser.id)
-        const { data: weakData } = await supabase.from('user_progress').select('question_id').eq('user_id', currentUser.id).order('mistake_count', { ascending: false }).limit(QUEST_LIMIT)
-        const weakIds = weakData?.map((w: any) => w.question_id) || []
-        let queue: KanjiWord[] = []
-        if (allWords) { queue = allWords.filter(w => weakIds.includes(w.id)); if (queue.length < QUEST_LIMIT) queue = [...queue, ...allWords.filter(w => !weakIds.includes(w.id)).sort(() => 0.5 - Math.random()).slice(0, QUEST_LIMIT - queue.length)]; }
-        setQuestQueue(queue); setCurrentIndex(0); setRickStep(0); setView('rick_challenge'); setLoading(false); return;
-    }
-
+    
     const { data: allWords } = await supabase.from('kanji_questions').select('*').eq('target_user', currentUser.id)
     if (!allWords || !allWords.length) { alert('漢字データがありません！保護者メニューから追加してください。'); setLoading(false); return }
     
+    // ★ ターゲット漢検レベルによるフィルタリング
+    let availableWords = allWords;
+    if (targetKyu !== 'all' && selectedMode !== 'parent_challenge' && selectedMode !== 'rick_challenge') {
+        availableWords = allWords.filter(w => w.kanji_level === targetKyu || w.category === targetKyu);
+        if (availableWords.length === 0) {
+            alert('選んだ級の漢字がまだ登録されていないよ！保護者メニューから追加するか、すべての級を選んでね🐶');
+            setLoading(false);
+            return;
+        }
+    }
+
     let queue: KanjiWord[] = []
+    
+    if (selectedMode === 'rick_challenge') {
+        const { data: weakData } = await supabase.from('user_progress').select('question_id').eq('user_id', currentUser.id).order('mistake_count', { ascending: false }).limit(QUEST_LIMIT)
+        const weakIds = weakData?.map((w: any) => w.question_id) || []
+        queue = allWords.filter(w => weakIds.includes(w.id)); 
+        if (queue.length < QUEST_LIMIT) queue = [...queue, ...allWords.filter(w => !weakIds.includes(w.id)).sort(() => 0.5 - Math.random()).slice(0, QUEST_LIMIT - queue.length)];
+        setQuestQueue(queue); setCurrentIndex(0); setRickStep(0); clearCanvas(); setView('rick_challenge'); setLoading(false); 
+        if(rickMode === 'think' || rickMode === 'write') speakWord(getFullReading(queue[0].reading, queue[0].okurigana));
+        return;
+    }
+    
     if (selectedMode === 'revenge') {
         const { data: weakData } = await supabase.from('user_progress').select('question_id').eq('user_id', currentUser.id).gt('mistake_count', 0).order('mistake_count', { ascending: false }).limit(challengeSettings.quest_count || 5)
         const worstIds = weakData?.map((w: any) => w.question_id) || []
         const todayIncorrectWords = dailyProgress.details?.filter(d => d.result === 'incorrect').map(d => d.word) || [];
-        queue = allWords.filter(w => worstIds.includes(w.id) || todayIncorrectWords.includes(w.kanji)).sort(() => 0.5 - Math.random())
+        queue = availableWords.filter(w => worstIds.includes(w.id) || todayIncorrectWords.includes(w.kanji)).sort(() => 0.5 - Math.random())
         if (queue.length === 0) { alert('復習する漢字がないよ！'); setLoading(false); return; }
         if (queue.length > challengeSettings.quest_count) queue = queue.slice(0, challengeSettings.quest_count);
     }
@@ -331,12 +406,12 @@ export default function Home() {
     else if (selectedMode === 'daily') {
       const { data: prog } = await supabase.from('user_progress').select('question_id, status, last_reviewed_at').eq('user_id', currentUser.id)
       const masteredMap = new Map<number, string>(); prog?.forEach((p: any) => { if (p.status === 'gold' || p.status === 'mastered') masteredMap.set(p.question_id, p.last_reviewed_at) })
-      const unmastered = allWords.filter(w => !masteredMap.has(w.id)).sort(() => 0.5 - Math.random())
-      const reviews = allWords.filter(w => masteredMap.has(w.id)).sort((a, b) => new Date(masteredMap.get(a.id)||0).getTime() - new Date(masteredMap.get(b.id)||0).getTime())
+      const unmastered = availableWords.filter(w => !masteredMap.has(w.id)).sort(() => 0.5 - Math.random())
+      const reviews = availableWords.filter(w => masteredMap.has(w.id)).sort((a, b) => new Date(masteredMap.get(a.id)||0).getTime() - new Date(masteredMap.get(b.id)||0).getTime())
       queue = [...unmastered]; if (queue.length < QUEST_LIMIT) queue = [...queue, ...reviews.slice(0, QUEST_LIMIT - queue.length)];
       queue = queue.slice(0, QUEST_LIMIT).sort(() => 0.5 - Math.random())
     } 
-    else queue = [...allWords].sort(() => 0.5 - Math.random()).slice(0, selectedMode === 'weekend' ? QUEST_LIMIT : undefined) 
+    else queue = [...availableWords].sort(() => 0.5 - Math.random()).slice(0, selectedMode === 'weekend' ? QUEST_LIMIT : undefined) 
 
     setQuestQueue(queue); setCurrentIndex(0); prepareQuestion(queue[0], allWords, selectedMode === 'weekend' ? 'weekend' : selectedMode, 1);
     setView('game'); setLoading(false)
@@ -347,14 +422,18 @@ export default function Home() {
     const cMode = modeOverride || mode; const cPhase = phaseOverride || weekendPhase
     let nextLangMode: 'kanji_to_read' | 'read_to_kanji' = 'kanji_to_read';
     
+    setGameStep(0);
+    clearCanvas();
+
     if (cMode === 'weekend') {
         if (cPhase === 1) { nextLangMode = 'kanji_to_read'; setInputMode('quiz') } 
         else if (cPhase === 2) { nextLangMode = 'read_to_kanji'; setInputMode('quiz') } 
         else if (cPhase === 3) { nextLangMode = 'kanji_to_read'; setInputMode('typing') } 
-    } else if (selectedInputMode.includes('typing')) { 
-        nextLangMode = 'kanji_to_read'; setInputMode('typing')
     } else { 
-        nextLangMode = selectedInputMode === 'quiz_kanji' ? 'read_to_kanji' : 'kanji_to_read'; setInputMode('quiz')
+        if (selectedInputMode === 'typing_read') { nextLangMode = 'kanji_to_read'; setInputMode('typing') } 
+        else if (selectedInputMode === 'quiz_kanji') { nextLangMode = 'read_to_kanji'; setInputMode('quiz') }
+        else if (selectedInputMode === 'write_canvas') { nextLangMode = 'read_to_kanji'; setInputMode('canvas') }
+        else if (selectedInputMode === 'write_self') { nextLangMode = 'read_to_kanji'; setInputMode('self') }
     }
     setLangMode(nextLangMode);
     
@@ -365,7 +444,27 @@ export default function Home() {
     setOptions([word, ...others].sort(() => 0.5 - Math.random()))
   }
 
-  const checkAnswer = async (ans: string) => {
+  const handleSelfJudge = async (isCorrect: boolean) => {
+      if (isProcessing) return;
+      setIsProcessing(true);
+      const cur = questQueue[currentIndex];
+      const newLog: ActivityLog = { time: new Date().toLocaleTimeString('ja-JP'), word: cur.kanji, mode: MODE_NAMES[mode] || mode, result: isCorrect ? 'correct' : 'incorrect' }
+      const updatedDetails = [...(dailyProgress.details || []), newLog];
+
+      if (isCorrect) {
+          playSound('correct');
+          confetti({ particleCount: 100, spread: 60, origin: { y: 0.6 } });
+          if (mode === 'weekend') { setBossHp(prev => Math.max(0, prev - 1)); setIsBossAttacked(true); setTimeout(() => setIsBossAttacked(false), 500); }
+          await updateProgress(cur.id, true, updatedDetails);
+          setTimeout(() => nextQuestion(), 1000);
+      } else {
+          playSound('wrong');
+          await updateProgress(cur.id, false, updatedDetails);
+          setTimeout(() => nextQuestion(), 1000);
+      }
+  }
+
+  const checkAnswer = async (ans: string, isVoice: boolean = false) => {
     if (isProcessing || showRick) return;
     setIsProcessing(true);
     const cur = questQueue[currentIndex]; 
@@ -374,17 +473,15 @@ export default function Home() {
     if (langMode === 'read_to_kanji') {
         cor = cur.kanji;
     } else {
-        if (inputMode === 'typing') {
-            cor = getFullReading(cur.reading, cur.okurigana);
-        } else {
-            cor = formatReading(cur.reading, cur.okurigana);
-        }
+        cor = inputMode === 'typing' ? getFullReading(cur.reading, cur.okurigana) : formatReading(cur.reading, cur.okurigana);
     }
     
     let isCorrect = false;
     if (inputMode === 'typing') {
         const normalize = (str: string) => str.replace(/[\u30a1-\u30f6]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0x60)).replace(/[\u3000\s]/g, '');
-        isCorrect = normalize(ans) === normalize(cor) && normalize(ans) !== '';
+        const normAns = normalize(ans); const normCor = normalize(cor);
+        const fullKanji = cur.okurigana ? `${cur.kanji}${cur.okurigana}` : cur.kanji;
+        isCorrect = (normAns === normCor && normAns !== '') || (isVoice && (ans === fullKanji || ans === cur.kanji));
     } else isCorrect = ans === cor;
 
     const newLog: ActivityLog = { time: new Date().toLocaleTimeString('ja-JP'), word: cur.kanji, mode: MODE_NAMES[mode] || mode, result: isCorrect ? 'correct' : 'incorrect' }
@@ -406,19 +503,18 @@ export default function Home() {
       if (inputMode === 'quiz') {
           const selectedWord = options.find(o => o.kanji === ans || formatReading(o.reading, o.okurigana) === ans || getFullReading(o.reading, o.okurigana) === ans);
           if (selectedWord && selectedWord.id !== cur.id) {
-              if (langMode === 'read_to_kanji') {
-                  setFeedbackMsg(<>❌ 選んだ「<span className="font-black text-rose-600">{selectedWord.kanji}</span>」は「<span className="font-black text-rose-600">{formatReading(selectedWord.reading, selectedWord.okurigana)}</span>」だよ！</>);
-              } else {
-                  setFeedbackMsg(<>❌ 選んだ「<span className="font-black text-rose-600">{formatReading(selectedWord.reading, selectedWord.okurigana)}</span>」は「<span className="font-black text-rose-600">{selectedWord.kanji}</span>」だよ！</>);
-              }
+              if (langMode === 'read_to_kanji') setFeedbackMsg(<>❌ 選んだ「<span className="font-black text-rose-600">{selectedWord.kanji}</span>」は「<span className="font-black text-rose-600">{formatReading(selectedWord.reading, selectedWord.okurigana)}</span>」だよ！</>);
+              else setFeedbackMsg(<>❌ 選んだ「<span className="font-black text-rose-600">{formatReading(selectedWord.reading, selectedWord.okurigana)}</span>」は「<span className="font-black text-rose-600">{selectedWord.kanji}</span>」だよ！</>);
           }
+      } else if (inputMode === 'typing' && isVoice) {
+          setFeedbackMsg(<>🎤「<span className="font-black text-rose-600">{ans}</span>」と聞こえたよ！違う漢字になっちゃったらキーボードで打ってね！</>);
       }
 
       if (mode === 'weekend' && weekendPhase === 3 && nextMistakeCount >= 3) { setShowFlashAnswer(true); setTimeout(() => { setShowFlashAnswer(false); }, 3000); return; }
       await updateProgress(cur.id, false, updatedDetails);
       if (nextMistakeCount >= 3 && !(mode === 'weekend' && weekendPhase === 3)) { setMessage(`残念... 正解は「${cor}」`); setShowRick(true) } else { 
         if (inputMode === 'typing' || (mode === 'weekend' && weekendPhase === 3)) {
-          if (nextMistakeCount === 1) { setMessage('ヒント：絵と文字が出たよ！👀'); } else if (nextMistakeCount === 2) { setMessage('答えを一瞬だけ見せるよ！👀'); setShowFlashAnswer(true); setTimeout(() => { setShowFlashAnswer(false); setMessage('ヒント：絵と文字を見て思い出して！'); }, 3000); }
+          if (nextMistakeCount === 1 && !isVoice) { setMessage('ヒント：絵と文字が出たよ！👀'); } else if (nextMistakeCount === 2) { setMessage('答えを一瞬だけ見せるよ！👀'); setShowFlashAnswer(true); setTimeout(() => { setShowFlashAnswer(false); setMessage('ヒント：絵と文字を見て思い出して！'); }, 3000); }
         }
       }
     }
@@ -436,7 +532,7 @@ export default function Home() {
         if (newStatus === 'gold' || newStatus === 'mastered') newStatus = 'silver'; else if (newStatus === 'silver') newStatus = 'bronze'; else newStatus = 'learning';
     }
 
-    const isWritingMode = ((mode === 'weekend') ? inputMode : (selectedInputMode === 'typing_read' ? 'typing' : 'quiz')) === 'typing';
+    const isWritingMode = ((mode === 'weekend') ? inputMode : (selectedInputMode === 'typing_read' ? 'typing' : 'quiz')) === 'typing' || rickMode === 'write' || inputMode === 'canvas' || inputMode === 'self';
     const newWritingMaster = (correct && isWritingMode) ? true : (currentData?.is_writing_master || false);
 
     await supabase.from('user_progress').upsert({ user_id: currentUser.id, question_id: id, status: newStatus, mistake_count: newMistake, is_writing_master: newWritingMaster, last_reviewed_at: new Date().toISOString() }, { onConflict: 'user_id, question_id' })
@@ -464,7 +560,9 @@ export default function Home() {
                else await supabase.from('daily_logs').update({ details: updatedDetails }).eq('user_id', currentUser.id).eq('date', getTodayJST()); 
                setDailyProgress({ ...dailyProgress, details: updatedDetails } as any); setView('result'); confetti({ particleCount: 300 }); return 
            }
-           setCurrentIndex(next); setRickStep(0); setIsTransitioning(false); return;
+           setCurrentIndex(next); setRickStep(0); clearCanvas(); setIsTransitioning(false); 
+           if(rickMode === 'think' || rickMode === 'write') speakWord(getFullReading(questQueue[next].reading, questQueue[next].okurigana));
+           return;
         }
         if (mode === 'weekend') {
           if (next >= questQueue.length) {
@@ -595,14 +693,14 @@ export default function Home() {
             <div className="bg-white p-6 rounded-2xl shadow-sm border-2 border-stone-100 animate-in fade-in">
               <h3 className="font-black text-sky-700 mb-6 flex items-center gap-2">➕ 新しい漢字の登録</h3>
               <div className="space-y-4">
-                <div><label className="text-xs font-bold text-stone-500 mb-1 block">漢字 <span className="text-red-500">*</span></label><input className="w-full border-2 border-stone-200 p-3 rounded-xl font-black text-2xl outline-none focus:border-sky-400 bg-stone-50" placeholder="例: 漢" value={newWord.kanji} onChange={e => setNewWord({...newWord, kanji: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-stone-500 mb-1 block">漢字・熟語 <span className="text-red-500">*</span></label><input className="w-full border-2 border-stone-200 p-3 rounded-xl font-black text-2xl outline-none focus:border-sky-400 bg-stone-50" placeholder="例: 漢、一生懸命" value={newWord.kanji} onChange={e => setNewWord({...newWord, kanji: e.target.value})} /></div>
                 <div><label className="text-xs font-bold text-stone-500 mb-1 block">読み <span className="text-red-500">*</span></label><input className="w-full border-2 border-stone-200 p-3 rounded-xl outline-none focus:border-sky-400 bg-stone-50 font-bold" placeholder="例: かん" value={newWord.reading} onChange={e => setNewWord({...newWord, reading: e.target.value})} /></div>
                 <div><label className="text-xs font-bold text-stone-500 mb-1 block">送り仮名 (あれば)</label><input className="w-full border-2 border-stone-200 p-3 rounded-xl outline-none focus:border-sky-400 bg-stone-50" placeholder="例: じる" value={newWord.okurigana} onChange={e => setNewWord({...newWord, okurigana: e.target.value})} /></div>
                 <div><label className="text-xs font-bold text-stone-500 mb-1 block">クイズ用例文</label><input className="w-full border-2 border-stone-200 p-3 rounded-xl outline-none focus:border-sky-400 bg-stone-50 text-sm" placeholder="例: □字のテスト (漢字部分を□にする)" value={newWord.sentence} onChange={e => setNewWord({...newWord, sentence: e.target.value})} /></div>
                 <div><label className="text-xs font-bold text-stone-500 mb-1 block">活用例文 (図鑑用)</label><textarea className="w-full border-2 border-stone-200 p-3 rounded-xl outline-none focus:border-sky-400 bg-stone-50 text-sm" placeholder="例: ミニチュアダックスフントのRICKを飼っている。" value={newWord.usage_example} onChange={e => setNewWord({...newWord, usage_example: e.target.value})} /></div>
                 <div><label className="text-xs font-bold text-stone-500 mb-1 block">漢字の成り立ち・ロジック</label><textarea className="w-full border-2 border-stone-200 p-3 rounded-xl outline-none focus:border-sky-400 bg-stone-50 text-sm" placeholder="例: 「食」と「司」が組み合わさっています。" value={newWord.origin_logic} onChange={e => setNewWord({...newWord, origin_logic: e.target.value})} /></div>
-                <div><label className="text-xs font-bold text-stone-500 mb-1 block">総画数</label><input type="number" className="w-full border-2 border-stone-200 p-3 rounded-xl outline-none focus:border-sky-400 bg-stone-50 font-bold" placeholder="例: 14" value={newWord.stroke_count} onChange={e => setNewWord({...newWord, stroke_count: e.target.value})} /></div>
-                <div><label className="text-xs font-bold text-stone-500 mb-1 block">学年・カテゴリ</label><select className="border-2 border-stone-200 p-3 rounded-xl w-full text-sm font-bold bg-white outline-none focus:border-sky-400" value={newWord.category} onChange={(e) => setNewWord({...newWord, category: e.target.value})}>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                <div><label className="text-xs font-bold text-stone-500 mb-1 block">総画数 (空欄でもOK)</label><input type="number" className="w-full border-2 border-stone-200 p-3 rounded-xl outline-none focus:border-sky-400 bg-stone-50 font-bold" placeholder="例: 14" value={newWord.stroke_count} onChange={e => setNewWord({...newWord, stroke_count: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-stone-500 mb-1 block">漢検レベル・カテゴリ</label><select className="border-2 border-stone-200 p-3 rounded-xl w-full text-sm font-bold bg-white outline-none focus:border-sky-400" value={newWord.category} onChange={(e) => setNewWord({...newWord, category: e.target.value})}>{CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                 <button onClick={handleAddWord} className="w-full bg-gradient-to-r from-sky-400 to-indigo-500 text-white py-4 rounded-xl font-black text-lg shadow-lg hover:opacity-90 transition active:scale-95 mt-4 tracking-widest">データベースに登録！</button>
               </div>
             </div>
@@ -628,11 +726,83 @@ export default function Home() {
           )}
 
           {adminTab === 'challenge' && (
-            <div className="bg-white p-6 rounded-2xl shadow-sm border-2 border-stone-100">
-              <h3 className="font-black text-red-600 mb-4">⚔️ クエスト設定</h3>
-              <div className="mb-4"><label className="text-sm font-bold block mb-1">目標日数</label><input type="number" className="border p-2 rounded w-full" value={challengeSettings.reward_goal_days} onChange={(e) => setChallengeSettings({ ...challengeSettings, reward_goal_days: Number(e.target.value) })} /></div>
-              <div className="mb-6"><label className="text-sm font-bold block mb-1">ご褒美</label><input type="text" className="border p-2 rounded w-full" value={challengeSettings.reward_text} onChange={(e) => setChallengeSettings({ ...challengeSettings, reward_text: e.target.value })} /></div>
-              <button onClick={() => saveChallengeSettings(challengeSettings)} className="w-full bg-red-500 text-white font-bold py-3 rounded-xl shadow-md">設定を保存</button>
+            <div className="space-y-6 animate-in fade-in">
+              <div className="bg-rose-50 p-5 rounded-2xl shadow-sm border-2 border-rose-100">
+                <h3 className="font-black text-rose-600 mb-4 flex items-center gap-2"><span>🎁</span> ご褒美設定</h3>
+                <div className="space-y-4">
+                  <div><label className="text-xs font-bold text-rose-800 block mb-1">目標日数 (日)</label><input type="number" className="w-full border-2 border-white p-3 rounded-xl outline-none focus:border-rose-300 bg-white/80 font-bold text-stone-700 shadow-inner" value={challengeSettings.reward_goal_days} onChange={(e) => setChallengeSettings({ ...challengeSettings, reward_goal_days: Number(e.target.value) })} /></div>
+                  <div><label className="text-xs font-bold text-rose-800 block mb-1">達成時のご褒美</label><input type="text" className="w-full border-2 border-white p-3 rounded-xl outline-none focus:border-rose-300 bg-white/80 font-bold text-stone-700 shadow-inner" value={challengeSettings.reward_text} onChange={(e) => setChallengeSettings({ ...challengeSettings, reward_text: e.target.value })} placeholder="例: 好きなおやつ" /></div>
+                </div>
+              </div>
+
+              <div className="bg-sky-50 p-5 rounded-2xl shadow-sm border-2 border-sky-100">
+                <h3 className="font-black text-sky-600 mb-2 flex items-center gap-2"><span>🩹</span> 連続日数の救済</h3>
+                <p className="text-[10px] font-bold text-sky-500 mb-3">体調不良等で途切れた場合、現在の連続日数を上書き修正できます。</p>
+                <div className="flex items-center gap-3">
+                  <input type="number" className="w-20 border-2 border-white p-3 rounded-xl outline-none focus:border-sky-300 bg-white/80 font-bold text-stone-700 text-center shadow-inner" value={editStreak} onChange={(e) => setEditStreak(Number(e.target.value))} />
+                  <span className="font-bold text-sky-800 text-sm">日に</span>
+                  <button onClick={handleSaveStreak} className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-xl shadow-md transition active:scale-95 text-sm">上書き修正する</button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 p-5 rounded-2xl shadow-sm border-2 border-amber-100">
+                <h3 className="font-black text-amber-600 mb-3 flex items-center gap-2"><span>☀️</span> いつもの (Daily)</h3>
+                <div className="grid grid-cols-4 gap-2">
+                  {[3, 5, 8, 10].map(num => (<button key={num} onClick={() => setChallengeSettings({ ...challengeSettings, quest_count: num })} className={`py-2 rounded-xl font-bold text-sm transition-all border-2 ${challengeSettings.quest_count === num ? 'bg-amber-500 text-white border-amber-500 shadow-md' : 'bg-white text-stone-500 border-white hover:border-amber-200 shadow-sm'}`}>{num}問</button>))}
+                </div>
+              </div>
+
+              <div className="bg-orange-50 p-5 rounded-2xl shadow-sm border-2 border-orange-100">
+                <h3 className="font-black text-orange-600 mb-3 flex items-center gap-2"><span>🔥</span> 挑戦状 (Rick/Parent)</h3>
+                <div className="grid grid-cols-4 gap-2">
+                  {[3, 5, 8, 10].map(num => (<button key={num} onClick={() => setChallengeSettings({ ...challengeSettings, challenge_quest_count: num })} className={`py-2 rounded-xl font-bold text-sm transition-all border-2 ${challengeSettings.challenge_quest_count === num ? 'bg-orange-500 text-white border-orange-500 shadow-md' : 'bg-white text-stone-500 border-white hover:border-orange-200 shadow-sm'}`}>{num}問</button>))}
+                </div>
+              </div>
+
+              <div className="bg-indigo-50 p-5 rounded-2xl shadow-sm border-2 border-indigo-100">
+                <h3 className="font-black text-indigo-600 mb-3 flex items-center gap-2"><span>🏰</span> 週末ボス (Weekend)</h3>
+                <div className="grid grid-cols-4 gap-2">
+                  {[3, 5, 8, 10].map(num => (<button key={num} onClick={() => setChallengeSettings({ ...challengeSettings, special_quest_count: num })} className={`py-2 rounded-xl font-bold text-sm transition-all border-2 ${challengeSettings.special_quest_count === num ? 'bg-indigo-500 text-white border-indigo-500 shadow-md' : 'bg-white text-stone-500 border-white hover:border-indigo-200 shadow-sm'}`}>{num}問</button>))}
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow-sm border-2 border-stone-200">
+                <h3 className="font-black text-stone-700 mb-4">パパの挑戦状の種類</h3>
+                <div className="flex gap-4 mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="challengeMode" checked={challengeSettings.mode === 'manual'} onChange={() => setChallengeSettings({ ...challengeSettings, mode: 'manual' })} className="text-rose-500 focus:ring-rose-500 w-4 h-4" />
+                    <span className={`text-sm font-bold ${challengeSettings.mode === 'manual' ? 'text-rose-600' : 'text-stone-500'}`}>手動で選ぶ</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="challengeMode" checked={challengeSettings.mode === 'auto'} onChange={() => setChallengeSettings({ ...challengeSettings, mode: 'auto' })} className="text-indigo-500 focus:ring-indigo-500 w-4 h-4" />
+                    <span className={`text-sm font-bold ${challengeSettings.mode === 'auto' ? 'text-indigo-600' : 'text-stone-500'}`}>苦手から自動</span>
+                  </label>
+                </div>
+
+                {challengeSettings.mode === 'auto' ? (
+                  <div className="bg-stone-50 p-4 rounded-xl border border-stone-200">
+                    <label className="text-xs font-bold text-stone-600 block mb-2">問題数を選択</label>
+                    <select value={challengeSettings.auto_count} onChange={(e) => setChallengeSettings({ ...challengeSettings, auto_count: Number(e.target.value) })} className="w-full p-2 border border-stone-300 rounded-lg text-sm font-bold text-stone-700 bg-white">
+                      {[3, 5, 8, 10, 15].map(n => <option key={n} value={n}>ワースト {n}問</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="mt-4 max-h-60 overflow-y-auto border-2 border-stone-200 rounded-xl p-2 bg-stone-50">
+                    {allWordsList.map(w => (
+                      <label key={w.id} className="flex items-center gap-3 p-2 hover:bg-stone-100 rounded-lg cursor-pointer transition border-b border-stone-100 last:border-b-0">
+                        <input type="checkbox" className="w-5 h-5 rounded border-stone-300 text-rose-500 focus:ring-rose-500" checked={challengeSettings.selected_ids?.includes(w.id)} onChange={() => handleParentChallengeUpdate(w.id)} />
+                        <span className="font-bold text-stone-800 text-lg">{w.kanji}</span>
+                        <span className="text-xs font-bold text-sky-600 bg-sky-100 px-2 py-0.5 rounded">{formatReading(w.reading, w.okurigana)}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => saveChallengeSettings(challengeSettings)} className="flex-[3] bg-rose-500 hover:bg-rose-600 text-white font-black py-4 rounded-xl shadow-lg transition active:scale-95 text-lg tracking-widest">すべての設定を保存</button>
+                <button onClick={() => sendLineToChild(`【パパ・ママからのお知らせ】\n\nクエストの設定を変更したよ！\nアプリを開いて確認してみてね！✨`)} className="flex-[1] bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg transition active:scale-95 flex items-center justify-center gap-1 text-sm">LINE通知</button>
+              </div>
             </div>
           )}
         </div>
@@ -663,9 +833,23 @@ export default function Home() {
         </div>
         <h1 className={`text-3xl font-black ${currentUser.text} mb-2 tracking-widest drop-shadow-sm`}>毎日漢検クエスト</h1>
         
-        <div className="bg-white p-1.5 rounded-2xl shadow-sm mb-6 flex gap-1 border-2 border-white/50 w-full max-w-sm">
-           <button onClick={() => setSelectedInputMode('quiz_kanji')} className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all ${selectedInputMode === 'quiz_kanji' ? `${currentUser.color} text-white shadow-md scale-105` : 'text-stone-400 hover:bg-stone-50'}`}>🔘 読み→漢字(4択)</button>
-           <button onClick={() => setSelectedInputMode('typing_read')} className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all ${selectedInputMode === 'typing_read' ? 'bg-stone-800 text-white shadow-md scale-105' : 'text-stone-400 hover:bg-stone-50'}`}>⌨️ 漢字→読み(入力)</button>
+        {/* ★ 出題モードの拡張と漢検レベル選択 UI */}
+        <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">
+           <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🎯</span> 出題する漢検レベル</p>
+           <select value={targetKyu} onChange={e => setTargetKyu(e.target.value)} className="w-full p-3 border-2 border-stone-200 rounded-xl text-sm font-black text-stone-700 bg-stone-50 outline-none focus:border-sky-400 mb-5 text-center shadow-inner">
+             <option value="all">すべての級から出題</option>
+             {CATEGORIES.filter(c => c.id !== 'general').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+           </select>
+
+           <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🕹️</span> 回答モード</p>
+           <div className="grid grid-cols-2 gap-2 mb-2">
+             <button onClick={() => setSelectedInputMode('quiz_kanji')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'quiz_kanji' ? `bg-orange-500 text-white border-orange-600 shadow-md` : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>🔘 漢字4択</button>
+             <button onClick={() => setSelectedInputMode('typing_read')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'typing_read' ? 'bg-indigo-500 text-white border-indigo-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>⌨️ 読み入力</button>
+           </div>
+           <div className="grid grid-cols-2 gap-2">
+             <button onClick={() => setSelectedInputMode('write_canvas')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'write_canvas' ? 'bg-emerald-500 text-white border-emerald-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>✍️ 手書き</button>
+             <button onClick={() => setSelectedInputMode('write_self')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'write_self' ? 'bg-sky-500 text-white border-sky-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>🧠 自己判定</button>
+           </div>
         </div>
         
         <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-5 mb-5 text-center border-b-4 border-stone-200 relative overflow-hidden">
@@ -717,10 +901,18 @@ export default function Home() {
             {dailyProgress.is_completed ? <span className="bg-white/30 px-3 py-1 rounded-full text-xs">クリア済</span> : <span className="bg-white/30 px-3 py-1 rounded-full text-sm">{displayCount}問</span>}
           </button>
           
-          <button onClick={() => { if (!isRickDone) startGame('rick_challenge'); }} className={`w-full py-3 px-6 rounded-2xl font-bold shadow-md transform transition-all flex items-center justify-between ${isRickDone ? 'bg-stone-200 text-white shadow-none' : 'bg-white border-2 border-stone-200 text-stone-700 hover:bg-stone-50 active:scale-95'}`}>
-            <div className="flex items-center gap-3"><span className="text-xl">⚡</span> <span>Rickの挑戦 (暗記カード)</span></div>
-            {isRickDone && <span className="text-xs text-stone-400">クリア済</span>}
-          </button>
+          <div className={`w-full p-4 rounded-2xl shadow-md border-2 transition-all ${isRickDone ? 'bg-stone-100 border-stone-200' : 'bg-white border-stone-100'}`}>
+              <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2"><span className="text-xl">⚡</span> <span className={`font-bold ${isRickDone ? 'text-stone-400' : 'text-stone-700'}`}>Rickの特訓</span></div>
+                  {isRickDone && <span className="text-xs text-stone-400 font-bold">クリア済</span>}
+              </div>
+              <div className="flex gap-1 mb-3">
+                  <button onClick={() => setRickMode('read')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'read' ? 'bg-orange-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>👀 読む</button>
+                  <button onClick={() => setRickMode('think')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'think' ? 'bg-sky-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>🧠 思い浮かべる</button>
+                  <button onClick={() => setRickMode('write')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'write' ? 'bg-emerald-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>✍️ 手書き</button>
+              </div>
+              <button onClick={() => { if (!isRickDone) startGame('rick_challenge'); }} className={`w-full py-3 rounded-xl font-black text-sm tracking-widest transition-all ${isRickDone ? 'bg-stone-200 text-white cursor-not-allowed' : 'bg-stone-800 text-white shadow-md active:scale-95 hover:bg-stone-700'}`}>特訓スタート！</button>
+          </div>
 
           <button onClick={() => startGame('weekend')} className={`w-full py-3 px-6 rounded-2xl font-bold shadow-md transform transition-all flex items-center justify-between ${isWeekendDone ? 'bg-stone-200 text-white shadow-none' : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white active:scale-95'}`}>
             <div className="flex items-center gap-3"><span className="text-xl">🏰</span> <span>週末ボスバトル</span></div>
@@ -751,7 +943,13 @@ export default function Home() {
   if (view === 'game') {
     const word = questQueue[currentIndex];
     if (isTransitioning) return (<div className={`min-h-screen ${currentUser.light} flex flex-col items-center justify-center pt-8 px-4`}><div className="animate-spin text-5xl mb-4">🌀</div><p className="text-stone-500 font-bold tracking-widest">Next Quest...</p></div>);
-    const currentInputMode = (mode === 'weekend') ? inputMode : (selectedInputMode.includes('quiz') ? 'quiz' : 'typing')
+    
+    // ★週末ボスの時は専用モード、それ以外は選んだモードを反映
+    const currentInputMode = (mode === 'weekend') ? inputMode : (
+        selectedInputMode === 'write_canvas' ? 'canvas' : 
+        selectedInputMode === 'write_self' ? 'self' : 
+        selectedInputMode === 'typing_read' ? 'typing' : 'quiz'
+    )
     
     return (
       <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-6 px-4 font-sans`}>
@@ -760,10 +958,10 @@ export default function Home() {
            {mode === 'weekend' && (<div className="w-full bg-slate-900 text-white p-5 flex flex-col items-center relative overflow-hidden"><p className="text-xs font-bold text-indigo-300 mb-2 tracking-widest">Weekend Boss Battle - Round {weekendPhase}</p><div className={`text-7xl mb-3 transition-transform duration-100 ${isBossAttacked ? 'scale-90 opacity-50 translate-x-1 translate-y-1' : 'animate-bounce'}`}>{bossHp > (currentGameGoal/2) ? '🐉' : bossHp > 0 ? '🦖' : '💥'}</div><div className="w-full max-w-xs bg-slate-700 rounded-full h-4 border-2 border-slate-500 relative overflow-hidden"><div className="bg-gradient-to-r from-rose-500 to-orange-500 h-full transition-all duration-300" style={{ width: `${(bossHp / currentGameGoal) * 100}%` }}></div></div><p className="font-bold mt-2 text-sm text-slate-300">BOSS HP: {bossHp} / {currentGameGoal}</p>{isBossAttacked && <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-6xl font-black text-rose-500 animate-ping">BANG!</div>}</div>)}
            
           <div className={`${currentUser.color} p-4 flex justify-between items-center text-white shadow-sm`}><span className="font-black tracking-widest text-sm bg-black/20 px-3 py-1 rounded-full">QUEST {currentIndex + 1} / {questQueue.length}</span><button onClick={() => { stopSpeaking(); setView('menu'); }} className="text-xs font-bold opacity-80 hover:opacity-100 bg-white/20 px-3 py-1 rounded-full">にげる</button></div>
-          <div className="flex-1 p-6 flex flex-col items-center justify-center relative">
+          <div className="flex-1 p-6 flex flex-col items-center justify-center relative w-full">
             
             {showRick && (
-              <div className="absolute inset-0 bg-stone-900/60 z-10 flex flex-col items-center justify-center p-4 animate-in fade-in backdrop-blur-sm">
+              <div className="absolute inset-0 bg-stone-900/60 z-20 flex flex-col items-center justify-center p-4 animate-in fade-in backdrop-blur-sm">
                 <div className="bg-white rounded-3xl p-6 flex flex-col items-center text-center shadow-2xl max-w-xs w-full animate-in zoom-in duration-300 border-4 border-white max-h-[90vh] overflow-y-auto no-scrollbar relative">
                   <img src="/Rick.png" alt="Rick" className="w-24 h-24 rounded-full border-4 border-orange-400 mb-3 shadow-xl object-cover shrink-0" />
                   <p className="text-xl font-black text-orange-600 mb-2 tracking-wide">{message}</p>
@@ -784,46 +982,108 @@ export default function Home() {
               </div>
             )}
             
-            {mode !== 'weekend' && ((showHint || mistakeCount >= 1) ? (<div className="w-28 h-28 bg-stone-100 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner animate-in zoom-in border-4 border-white">{word.emoji}</div>) : (<div className="w-28 h-28 bg-stone-50 rounded-full flex items-center justify-center text-5xl mb-6 border-4 border-dashed border-stone-200 text-stone-300">❓</div>))}
+            {(currentInputMode === 'quiz' || currentInputMode === 'typing') && mode !== 'weekend' && ((showHint || mistakeCount >= 1) ? (<div className="w-28 h-28 bg-stone-100 rounded-full flex items-center justify-center text-5xl mb-6 shadow-inner animate-in zoom-in border-4 border-white">{word.emoji}</div>) : (<div className="w-28 h-28 bg-stone-50 rounded-full flex items-center justify-center text-5xl mb-6 border-4 border-dashed border-stone-200 text-stone-300">❓</div>))}
             
-            <div className="mb-8 text-center w-full flex flex-col items-center">
-              {currentInputMode === 'typing' && mistakeCount >= 1 && (showFlashAnswer ? (<div className="animate-bounce"><p className="text-sm text-rose-500 font-bold mb-2">答えを覚えて！</p><p className="text-5xl font-black text-rose-600">{renderReading(word.reading, word.okurigana)}</p></div>) : (<p className="text-lg font-bold text-stone-400 mb-4 animate-pulse bg-stone-100 py-1 px-4 rounded-full inline-block">ひらがなで入力してね</p>))}
-              
-              {currentInputMode === 'quiz' ? (
-                  <div className="w-full flex flex-col items-center">
-                      {langMode === 'kanji_to_read' ? (
-                          <div className="bg-stone-50 border-2 border-stone-200 rounded-3xl p-8 shadow-inner w-full"><h2 className="text-[5rem] font-black text-stone-800 leading-none">{word.kanji}</h2></div>
-                      ) : (
-                          <div className="bg-sky-50 border-2 border-sky-200 rounded-3xl p-6 shadow-inner w-full"><h2 className="text-4xl font-black text-sky-800 mb-3">{renderReading(word.reading, word.okurigana)}</h2>{word.sentence && <p className="text-stone-600 font-bold text-lg bg-white py-2 px-4 rounded-xl shadow-sm border border-sky-100">{word.sentence.replace('□', '〇')}</p>}</div>
-                      )}
-                      
-                      {feedbackMsg && (
-                          <div className="mt-4 bg-rose-50 border-2 border-rose-200 text-stone-700 py-2 px-5 rounded-xl text-sm animate-in zoom-in slide-in-from-bottom-2 shadow-sm font-bold">
-                              {feedbackMsg}
-                          </div>
-                      )}
-                  </div>
-              ) : (
-                  <div className="bg-stone-50 border-2 border-stone-200 rounded-3xl p-6 shadow-inner mb-6 w-full">
-                      <h2 className="text-6xl font-black text-stone-800 mb-3">{word.kanji}</h2>
-                      {word.sentence && <p className="text-stone-500 font-bold mb-3">{word.sentence}</p>}
-                      <p className="text-sm font-black text-sky-600 bg-sky-100 py-1 px-4 rounded-full inline-block animate-pulse">読みを入力！</p>
-                  </div>
-              )}
-            </div>
+            {/* ★ キャンバス ＆ 自己判定 モードのUI */}
+            {(currentInputMode === 'canvas' || currentInputMode === 'self') && (
+                <div className="flex-1 w-full flex flex-col items-center">
+                    <div className="text-center mb-4 w-full">
+                        <p className="text-3xl font-black text-sky-600 bg-sky-50 px-5 py-2 rounded-2xl inline-block border border-sky-100">{renderReading(word.reading, word.okurigana)}</p>
+                        {word.sentence && <p className="text-base font-bold text-stone-600 mt-3 bg-stone-50 py-2 rounded-xl border border-stone-200">{word.sentence.replace('□', '〇')}</p>}
+                    </div>
 
-            {currentInputMode === 'quiz' ? (
-                <div className="grid grid-cols-1 gap-3 w-full">
+                    {currentInputMode === 'canvas' ? (
+                        <div className={`relative w-full bg-white border-4 rounded-2xl mb-4 overflow-hidden shadow-inner flex-1 min-h-[220px] transition-colors ${gameStep === 0 ? 'border-emerald-200' : 'border-stone-200'}`}>
+                            {gameStep === 0 && <span className="absolute top-2 left-2 text-stone-300 font-bold text-xs pointer-events-none">ここに指で書いてね</span>}
+                            <canvas ref={canvasRef} width={400} height={300} className="w-full h-full touch-none cursor-crosshair" onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerLeave={stopDrawing} style={{ touchAction: 'none' }} />
+                            {gameStep === 0 && <button onClick={clearCanvas} className="absolute top-2 right-2 bg-stone-100 hover:bg-stone-200 text-stone-500 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm active:scale-95 transition">🗑️ 消す</button>}
+                        </div>
+                    ) : (
+                        <div className="relative w-full bg-stone-50 border-4 border-dashed border-stone-200 rounded-2xl mb-4 flex items-center justify-center flex-1 min-h-[220px]">
+                            {gameStep === 0 ? <div className="text-center"><span className="text-6xl text-stone-300 mb-2 block">❓</span><span className="text-xs text-stone-400 font-bold">紙に書いて答え合わせしよう</span></div> : <span className="text-[6rem] font-black text-stone-800 drop-shadow-md">{word.kanji}</span>}
+                        </div>
+                    )}
+
+                    {gameStep === 0 ? (
+                        <button onClick={() => setGameStep(1)} className="w-full bg-stone-800 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition text-lg tracking-widest mt-auto shrink-0">答えを見る 👀</button>
+                    ) : (
+                        <div className="w-full animate-in slide-in-from-bottom flex flex-col items-center mt-auto shrink-0">
+                            {currentInputMode === 'canvas' && (
+                                <div className="bg-amber-50 w-full rounded-2xl p-4 mb-4 border-2 border-amber-200 shadow-sm relative text-center flex items-center justify-center gap-4">
+                                    <div><p className="text-xs font-bold text-amber-700 mb-1">正解は...</p><p className="text-5xl font-black text-stone-800">{word.kanji}</p></div>
+                                    {(word.usage_example || word.origin_logic) && (
+                                        <div className="flex-1 text-left">
+                                            {word.origin_logic && <p className="text-[10px] font-bold text-stone-600 bg-white p-1.5 rounded border border-stone-100 leading-tight">💡 {word.origin_logic}</p>}
+                                            {!word.origin_logic && word.usage_example && <p className="text-[10px] font-bold text-stone-600 bg-white p-1.5 rounded border border-stone-100 leading-tight">📖 {word.usage_example}</p>}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            <div className="flex gap-3 w-full">
+                                <button onClick={() => handleSelfJudge(false)} className="flex-1 bg-white text-rose-500 font-black py-4 rounded-2xl border-b-4 border-rose-200 active:translate-y-1 active:border-b-0 transition text-base">❌ 書けなかった</button>
+                                <button onClick={() => handleSelfJudge(true)} className="flex-1 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white font-black py-4 rounded-2xl shadow-lg hover:opacity-90 active:scale-95 transition text-base tracking-widest">⭕ 書けた！</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* クイズ・タイピングモード UI */}
+            {(currentInputMode === 'quiz' || currentInputMode === 'typing') && (
+                <div className="mb-8 text-center w-full flex flex-col items-center">
+                  {currentInputMode === 'typing' && mistakeCount >= 1 && (showFlashAnswer ? (<div className="animate-bounce"><p className="text-sm text-rose-500 font-bold mb-2">答えを覚えて！</p><p className="text-5xl font-black text-rose-600">{renderReading(word.reading, word.okurigana)}</p></div>) : (<p className="text-lg font-bold text-stone-400 mb-4 animate-pulse bg-stone-100 py-1 px-4 rounded-full inline-block">ひらがなで入力してね</p>))}
+                  
+                  {currentInputMode === 'quiz' ? (
+                      <div className="w-full flex flex-col items-center">
+                          {langMode === 'kanji_to_read' ? (
+                              <div className="bg-stone-50 border-2 border-stone-200 rounded-3xl p-8 shadow-inner w-full"><h2 className="text-[5rem] font-black text-stone-800 leading-none">{word.kanji}</h2></div>
+                          ) : (
+                              <div className="bg-sky-50 border-2 border-sky-200 rounded-3xl p-6 shadow-inner w-full"><h2 className="text-4xl font-black text-sky-800 mb-3">{renderReading(word.reading, word.okurigana)}</h2>{word.sentence && <p className="text-stone-600 font-bold text-lg bg-white py-2 px-4 rounded-xl shadow-sm border border-sky-100">{word.sentence.replace('□', '〇')}</p>}</div>
+                          )}
+                          
+                          {feedbackMsg && (
+                              <div className="mt-4 bg-rose-50 border-2 border-rose-200 text-stone-700 py-2 px-5 rounded-xl text-sm animate-in zoom-in slide-in-from-bottom-2 shadow-sm font-bold">
+                                  {feedbackMsg}
+                              </div>
+                          )}
+                      </div>
+                  ) : (
+                      <div className="bg-stone-50 border-2 border-stone-200 rounded-3xl p-6 shadow-inner mb-6 w-full">
+                          <h2 className="text-6xl font-black text-stone-800 mb-3">{word.kanji}</h2>
+                          {word.sentence && <p className="text-stone-500 font-bold mb-3">{word.sentence}</p>}
+                          <p className="text-sm font-black text-sky-600 bg-sky-100 py-1 px-4 rounded-full inline-block animate-pulse">読みを入力！</p>
+                      </div>
+                  )}
+                </div>
+            )}
+
+            {currentInputMode === 'quiz' && (
+                <div className="grid grid-cols-1 gap-3 w-full mt-auto">
                     {options.map((opt) => (
                         <button key={opt.id} onClick={() => checkAnswer(langMode === 'kanji_to_read' ? getFullReading(opt.reading, opt.okurigana) : opt.kanji)} className="bg-white hover:bg-orange-50 border-b-4 border-stone-200 hover:border-orange-300 text-stone-700 font-black py-5 px-4 rounded-2xl transition-all text-2xl shadow-sm active:translate-y-1 active:border-b-0">
                             {langMode === 'kanji_to_read' ? renderReading(opt.reading, opt.okurigana) : opt.kanji}
                         </button>
                     ))}
                 </div>
-            ) : (
+            )}
+            
+            {currentInputMode === 'typing' && (
                 <div className="w-full mt-auto">
-                    <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && checkAnswer(userAnswer)} className="w-full border-4 border-sky-200 rounded-2xl p-5 text-center text-3xl font-black focus:outline-none focus:border-sky-500 mb-4 text-stone-800 shadow-inner bg-stone-50" placeholder="ひらがなで..." autoFocus />
+                    <div className="relative mb-4 w-full flex items-center justify-center">
+                        <input type="text" value={userAnswer} onChange={(e) => setUserAnswer(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && checkAnswer(userAnswer)} className="w-full border-4 border-sky-200 rounded-2xl py-5 pl-5 pr-16 text-center text-3xl font-black focus:outline-none focus:border-sky-500 text-stone-800 shadow-inner bg-stone-50" placeholder="ひらがなで..." autoFocus />
+                        <button onClick={startListening} className={`absolute right-4 text-4xl transition-transform active:scale-90 ${isListening ? 'animate-pulse text-rose-500 scale-110 drop-shadow-md' : 'text-stone-400 hover:text-sky-500'}`} title="マイクで答える">
+                            {isListening ? '🎙️' : '🎤'}
+                        </button>
+                    </div>
+                    
+                    {feedbackMsg && (
+                        <div className="mb-4 bg-rose-50 border-2 border-rose-200 text-stone-700 py-2 px-5 rounded-xl text-sm animate-in zoom-in slide-in-from-bottom-2 shadow-sm font-bold">
+                            {feedbackMsg}
+                        </div>
+                    )}
+
                     <button onClick={() => checkAnswer(userAnswer)} className="w-full bg-gradient-to-r from-sky-400 to-indigo-500 text-white font-black py-4 rounded-2xl shadow-lg hover:opacity-90 transition active:scale-95 text-xl tracking-widest">答える！</button>
+                    <p className="text-[11px] text-stone-400 mt-4 font-bold bg-stone-100 py-2 px-3 rounded-lg border border-stone-100 shadow-inner">💡 マイクボタン(🎤)を押して声で答えることもできるよ！<br/>(うまく認識しない時はキーボードで打ってね)</p>
                 </div>
             )}
           </div>
@@ -855,7 +1115,7 @@ export default function Home() {
   }
 
   if (view === 'collection') {
-    const filteredGold = collectionData.gold.filter((w: KanjiWord) => collectionTab === 'general' ? true : w.category === collectionTab); const filteredSilver = collectionData.silver.filter((w: KanjiWord) => collectionTab === 'general' ? true : w.category === collectionTab); const filteredBronze = collectionData.bronze.filter((w: KanjiWord) => collectionTab === 'general' ? true : w.category === collectionTab); const filteredLearning = collectionData.learning.filter((w: KanjiWord) => collectionTab === 'general' ? true : w.category === collectionTab);
+    const filteredGold = collectionData.gold.filter((w: KanjiWord) => collectionTab === 'general' ? true : w.kanji_level === collectionTab || w.category === collectionTab); const filteredSilver = collectionData.silver.filter((w: KanjiWord) => collectionTab === 'general' ? true : w.kanji_level === collectionTab || w.category === collectionTab); const filteredBronze = collectionData.bronze.filter((w: KanjiWord) => collectionTab === 'general' ? true : w.kanji_level === collectionTab || w.category === collectionTab); const filteredLearning = collectionData.learning.filter((w: KanjiWord) => collectionTab === 'general' ? true : w.kanji_level === collectionTab || w.category === collectionTab);
     
    const renderWordCard = (w: any, colorClass: string) => {
     const isRevealed = revealedCards.includes(w.id); 
@@ -921,34 +1181,120 @@ export default function Home() {
 
   if (view === 'rick_challenge') {
     const word = questQueue[currentIndex]
-    return (
-        <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-10 px-4 font-sans`}>
-            <h2 className="text-xl font-black text-orange-600 mb-6 bg-white px-6 py-2 rounded-full shadow-sm border-2 border-orange-100">⚡ Rickの挑戦状 ({currentIndex + 1}/{questQueue.length})</h2>
-            <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl h-96 flex flex-col items-center justify-center p-8 cursor-pointer active:scale-95 transition-all relative overflow-hidden border-4 border-white/50" onClick={() => setRickStep(prev => prev < 2 ? (prev + 1) as 0|1|2 : prev)}>
-                <p className="text-stone-400 font-bold text-xs absolute top-5 bg-stone-50 px-3 py-1 rounded-full">タップしてめくる</p>
-                {rickStep === 0 && <p className="text-[6rem] font-black text-stone-800 drop-shadow-sm">{word.kanji}</p>}
-                {rickStep === 1 && <div className="text-center animate-in zoom-in"><p className="text-5xl font-black text-stone-300 mb-6">{word.kanji}</p><p className="text-6xl font-black text-sky-600 drop-shadow-sm">{renderReading(word.reading, word.okurigana)}</p></div>}
+    
+    if (rickMode === 'read') {
+        return (
+            <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-10 px-4 font-sans`}>
+                <h2 className="text-xl font-black text-orange-600 mb-6 bg-white px-6 py-2 rounded-full shadow-sm border-2 border-orange-100">⚡ Rickの特訓 ({currentIndex + 1}/{questQueue.length})</h2>
+                <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl h-96 flex flex-col items-center justify-center p-8 cursor-pointer active:scale-95 transition-all relative overflow-hidden border-4 border-white/50" onClick={() => setRickStep(prev => prev < 2 ? (prev + 1) as 0|1|2 : prev)}>
+                    <p className="text-stone-400 font-bold text-xs absolute top-5 bg-stone-50 px-3 py-1 rounded-full">タップしてめくる</p>
+                    {rickStep === 0 && <p className="text-[6rem] font-black text-stone-800 drop-shadow-sm">{word.kanji}</p>}
+                    {rickStep === 1 && <div className="text-center animate-in zoom-in"><p className="text-5xl font-black text-stone-300 mb-6">{word.kanji}</p><p className="text-6xl font-black text-sky-600 drop-shadow-sm">{renderReading(word.reading, word.okurigana)}</p></div>}
+                    {rickStep === 2 && (
+                        <div className="text-center animate-in zoom-in w-full overflow-y-auto no-scrollbar max-h-full py-4 relative">
+                            {word.stroke_count && <span className="absolute top-0 right-0 text-[10px] font-bold text-stone-400 bg-stone-100 px-2 py-1 rounded-full">{word.stroke_count}画</span>}
+                            <div className="text-6xl mb-3 drop-shadow-md">{word.emoji}</div>
+                            <p className="text-4xl font-black text-stone-800 mb-2">{word.kanji}</p>
+                            <p className="text-xl text-sky-600 font-bold bg-sky-50 py-1 rounded-lg inline-block px-4 mb-3">{renderReading(word.reading, word.okurigana)}</p>
+                            {word.usage_example && <div className="bg-sky-50 p-2 rounded-xl border border-sky-100 text-left mb-2"><p className="text-[10px] font-black text-sky-700 mb-1">📖 例文</p><p className="text-xs font-bold text-stone-700">{word.usage_example}</p></div>}
+                            {word.origin_logic && <div className="bg-amber-50 p-2 rounded-xl border border-amber-100 text-left"><p className="text-[10px] font-black text-amber-700 mb-1">💡 成り立ち</p><p className="text-xs font-bold text-stone-700">{word.origin_logic}</p></div>}
+                            {!word.usage_example && !word.origin_logic && word.sentence && <p className="text-sm font-bold text-stone-500 mt-4 bg-stone-50 py-2 rounded-xl">{word.sentence}</p>}
+                        </div>
+                    )}
+                </div>
                 {rickStep === 2 && (
-                    <div className="text-center animate-in zoom-in w-full overflow-y-auto no-scrollbar max-h-full py-4 relative">
-                        {word.stroke_count && <span className="absolute top-0 right-0 text-[10px] font-bold text-stone-400 bg-stone-100 px-2 py-1 rounded-full">{word.stroke_count}画</span>}
-                        <div className="text-6xl mb-3 drop-shadow-md">{word.emoji}</div>
-                        <p className="text-4xl font-black text-stone-800 mb-2">{word.kanji}</p>
-                        <p className="text-xl text-sky-600 font-bold bg-sky-50 py-1 rounded-lg inline-block px-4 mb-3">{renderReading(word.reading, word.okurigana)}</p>
-                        {word.usage_example && <div className="bg-sky-50 p-2 rounded-xl border border-sky-100 text-left mb-2"><p className="text-[10px] font-black text-sky-700 mb-1">📖 例文</p><p className="text-xs font-bold text-stone-700">{word.usage_example}</p></div>}
-                        {word.origin_logic && <div className="bg-amber-50 p-2 rounded-xl border border-amber-100 text-left"><p className="text-[10px] font-black text-amber-700 mb-1">💡 成り立ち</p><p className="text-xs font-bold text-stone-700">{word.origin_logic}</p></div>}
-                        {!word.usage_example && !word.origin_logic && word.sentence && <p className="text-sm font-bold text-stone-500 mt-4 bg-stone-50 py-2 rounded-xl">{word.sentence}</p>}
+                    <div className="flex gap-4 w-full max-w-sm mt-8 animate-in slide-in-from-bottom">
+                        <button onClick={() => { const updated = [...(dailyProgress.details || []), { time: new Date().toLocaleTimeString('ja-JP'), word: word.kanji, mode: '⚡', result: 'incorrect' } as ActivityLog]; updateProgress(word.id, false, updated).then(nextQuestion); }} className="flex-1 bg-white text-rose-500 font-black py-4 rounded-2xl border-b-4 border-rose-200 active:translate-y-1 active:border-b-0 transition text-lg">❌ まだ...</button>
+                        <button onClick={() => { const updated = [...(dailyProgress.details || []), { time: new Date().toLocaleTimeString('ja-JP'), word: word.kanji, mode: '⚡', result: 'correct' } as ActivityLog]; updateProgress(word.id, true, updated).then(nextQuestion); }} className="flex-1 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white font-black py-4 rounded-2xl shadow-lg hover:opacity-90 active:scale-95 transition text-lg tracking-widest">⭕ 覚えた！</button>
                     </div>
                 )}
+                <button onClick={() => { stopSpeaking(); setView('menu'); }} className="mt-8 text-stone-400 font-bold underline hover:text-stone-600 bg-white/50 px-4 py-2 rounded-full">やめる</button>
             </div>
-            {rickStep === 2 && (
-                <div className="flex gap-4 w-full max-w-sm mt-8 animate-in slide-in-from-bottom">
-                    <button onClick={() => { const updated = [...(dailyProgress.details || []), { time: new Date().toLocaleTimeString('ja-JP'), word: word.kanji, mode: '⚡', result: 'incorrect' } as ActivityLog]; updateProgress(word.id, false, updated).then(nextQuestion); }} className="flex-1 bg-white text-rose-500 font-black py-4 rounded-2xl border-b-4 border-rose-200 active:translate-y-1 active:border-b-0 transition text-lg">❌ まだ...</button>
-                    <button onClick={() => { const updated = [...(dailyProgress.details || []), { time: new Date().toLocaleTimeString('ja-JP'), word: word.kanji, mode: '⚡', result: 'correct' } as ActivityLog]; updateProgress(word.id, true, updated).then(nextQuestion); }} className="flex-1 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white font-black py-4 rounded-2xl shadow-lg hover:opacity-90 active:scale-95 transition text-lg tracking-widest">⭕ 覚えた！</button>
+        )
+    }
+
+    if (rickMode === 'think') {
+        return (
+            <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-10 px-4 font-sans`}>
+                <h2 className="text-xl font-black text-sky-600 mb-6 bg-white px-6 py-2 rounded-full shadow-sm border-2 border-sky-100">🧠 脳内テスト ({currentIndex + 1}/{questQueue.length})</h2>
+                <div className="w-full max-w-sm bg-white rounded-[2rem] shadow-2xl h-96 flex flex-col items-center justify-center p-8 cursor-pointer active:scale-95 transition-all relative overflow-hidden border-4 border-white/50" onClick={() => { if(rickStep === 0) setRickStep(1); else if(rickStep === 1) setRickStep(2); }}>
+                    <p className="text-stone-400 font-bold text-xs absolute top-5 bg-stone-50 px-3 py-1 rounded-full">頭に漢字を思い浮かべてタップ！</p>
+                    {rickStep === 0 && (
+                        <div className="text-center animate-in zoom-in w-full">
+                            <p className="text-4xl font-black text-sky-600 mb-4 bg-sky-50 px-4 py-2 rounded-2xl inline-block">{renderReading(word.reading, word.okurigana)}</p>
+                            {word.sentence && <p className="text-lg font-bold text-stone-600 border-2 border-dashed border-stone-200 p-4 rounded-xl">{word.sentence.replace('□', '〇')}</p>}
+                        </div>
+                    )}
+                    {rickStep === 1 && (
+                        <div className="text-center animate-in zoom-in">
+                            <p className="text-2xl font-bold text-sky-600 mb-4">{renderReading(word.reading, word.okurigana)}</p>
+                            <p className="text-[6rem] font-black text-stone-800 drop-shadow-sm leading-none">{word.kanji}</p>
+                        </div>
+                    )}
+                    {rickStep === 2 && (
+                        <div className="text-center animate-in zoom-in w-full overflow-y-auto no-scrollbar max-h-full py-2 relative">
+                            {word.stroke_count && <span className="absolute top-0 right-0 text-[10px] font-bold text-stone-400 bg-stone-100 px-2 py-1 rounded-full">{word.stroke_count}画</span>}
+                            <p className="text-4xl font-black text-stone-800 mb-2">{word.kanji}</p>
+                            <p className="text-xl text-sky-600 font-bold bg-sky-50 py-1 rounded-lg inline-block px-4 mb-3">{renderReading(word.reading, word.okurigana)}</p>
+                            {word.usage_example && <div className="bg-sky-50 p-2 rounded-xl border border-sky-100 text-left mb-2"><p className="text-[10px] font-black text-sky-700 mb-1">📖 例文</p><p className="text-xs font-bold text-stone-700">{word.usage_example}</p></div>}
+                            {word.origin_logic && <div className="bg-amber-50 p-2 rounded-xl border border-amber-100 text-left"><p className="text-[10px] font-black text-amber-700 mb-1">💡 成り立ち</p><p className="text-xs font-bold text-stone-700">{word.origin_logic}</p></div>}
+                            {!word.usage_example && !word.origin_logic && word.sentence && <p className="text-sm font-bold text-stone-500 mt-4 bg-stone-50 py-2 rounded-xl">{word.sentence}</p>}
+                        </div>
+                    )}
                 </div>
-            )}
-            <button onClick={() => { stopSpeaking(); setView('menu'); }} className="mt-8 text-stone-400 font-bold underline hover:text-stone-600 bg-white/50 px-4 py-2 rounded-full">やめる</button>
-        </div>
-    )
+                {rickStep >= 1 && (
+                    <div className="flex gap-4 w-full max-w-sm mt-8 animate-in slide-in-from-bottom">
+                        <button onClick={() => { const updated = [...(dailyProgress.details || []), { time: new Date().toLocaleTimeString('ja-JP'), word: word.kanji, mode: '⚡', result: 'incorrect' } as ActivityLog]; updateProgress(word.id, false, updated).then(nextQuestion); }} className="flex-1 bg-white text-rose-500 font-black py-4 rounded-2xl border-b-4 border-rose-200 active:translate-y-1 active:border-b-0 transition text-lg">❌ 書けなかった</button>
+                        <button onClick={() => { const updated = [...(dailyProgress.details || []), { time: new Date().toLocaleTimeString('ja-JP'), word: word.kanji, mode: '⚡', result: 'correct' } as ActivityLog]; updateProgress(word.id, true, updated).then(nextQuestion); }} className="flex-1 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white font-black py-4 rounded-2xl shadow-lg hover:opacity-90 active:scale-95 transition text-lg tracking-widest">⭕ 書けた！</button>
+                    </div>
+                )}
+                <button onClick={() => { stopSpeaking(); setView('menu'); }} className="mt-8 text-stone-400 font-bold underline hover:text-stone-600 bg-white/50 px-4 py-2 rounded-full">やめる</button>
+            </div>
+        )
+    }
+
+    if (rickMode === 'write') {
+        return (
+            <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-6 px-4 font-sans`}>
+                <div className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col relative transition-all duration-300 border border-white/50 min-h-[550px]">
+                    <div className={`${currentUser.color} p-4 flex justify-between items-center text-white shadow-sm`}><span className="font-black tracking-widest text-sm bg-black/20 px-3 py-1 rounded-full">✍️ 手書き特訓 {currentIndex + 1} / {questQueue.length}</span><button onClick={() => { stopSpeaking(); setView('menu'); }} className="text-xs font-bold opacity-80 hover:opacity-100 bg-white/20 px-3 py-1 rounded-full">にげる</button></div>
+                    
+                    <div className="flex-1 p-5 flex flex-col items-center h-full relative">
+                         <div className="text-center mb-4 w-full">
+                             <p className="text-2xl font-black text-sky-600 bg-sky-50 px-4 py-1 rounded-xl inline-block border border-sky-100">{renderReading(word.reading, word.okurigana)}</p>
+                             {word.sentence && <p className="text-sm font-bold text-stone-600 mt-2">{word.sentence.replace('□', '〇')}</p>}
+                         </div>
+
+                         <div className={`relative w-full bg-white border-4 rounded-2xl mb-4 overflow-hidden shadow-inner flex-1 min-h-[220px] transition-colors ${rickStep === 0 ? 'border-emerald-200' : 'border-stone-200'}`}>
+                             {rickStep === 0 && <span className="absolute top-2 left-2 text-stone-300 font-bold text-xs pointer-events-none">ここに指で書いてね</span>}
+                             <canvas ref={canvasRef} width={400} height={300} className="w-full h-full touch-none cursor-crosshair" onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} onPointerLeave={stopDrawing} style={{ touchAction: 'none' }} />
+                             {rickStep === 0 && <button onClick={clearCanvas} className="absolute top-2 right-2 bg-stone-100 hover:bg-stone-200 text-stone-500 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm active:scale-95 transition">🗑️ 消す</button>}
+                         </div>
+
+                         {rickStep === 0 ? (
+                             <button onClick={() => setRickStep(1)} className="w-full bg-stone-800 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition text-lg tracking-widest mt-auto">答えを見る 👀</button>
+                         ) : (
+                             <div className="w-full animate-in slide-in-from-bottom flex flex-col items-center mt-auto">
+                                 <div className="bg-amber-50 w-full rounded-2xl p-4 mb-4 border-2 border-amber-200 shadow-sm relative text-center flex items-center justify-center gap-4">
+                                     <div><p className="text-xs font-bold text-amber-700 mb-1">正解は...</p><p className="text-6xl font-black text-stone-800">{word.kanji}</p></div>
+                                     {(word.usage_example || word.origin_logic) && (
+                                         <div className="flex-1 text-left">
+                                             {word.origin_logic && <p className="text-[10px] font-bold text-stone-600 bg-white p-1.5 rounded border border-stone-100 leading-tight">💡 {word.origin_logic}</p>}
+                                             {!word.origin_logic && word.usage_example && <p className="text-[10px] font-bold text-stone-600 bg-white p-1.5 rounded border border-stone-100 leading-tight">📖 {word.usage_example}</p>}
+                                         </div>
+                                     )}
+                                 </div>
+                                 <div className="flex gap-3 w-full">
+                                    <button onClick={() => { const updated = [...(dailyProgress.details || []), { time: new Date().toLocaleTimeString('ja-JP'), word: word.kanji, mode: '⚡', result: 'incorrect' } as ActivityLog]; updateProgress(word.id, false, updated).then(nextQuestion); }} className="flex-1 bg-white text-rose-500 font-black py-4 rounded-2xl border-b-4 border-rose-200 active:translate-y-1 active:border-b-0 transition text-base">❌ 書けなかった</button>
+                                    <button onClick={() => { const updated = [...(dailyProgress.details || []), { time: new Date().toLocaleTimeString('ja-JP'), word: word.kanji, mode: '⚡', result: 'correct' } as ActivityLog]; updateProgress(word.id, true, updated).then(nextQuestion); }} className="flex-1 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white font-black py-4 rounded-2xl shadow-lg hover:opacity-90 active:scale-95 transition text-base tracking-widest">⭕ 書けた！</button>
+                                 </div>
+                             </div>
+                         )}
+                    </div>
+                </div>
+            </div>
+        )
+    }
   }
 
   return null
