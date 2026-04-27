@@ -4,10 +4,13 @@ import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
-// ★ ここがブラウザのタブに表示されるタイトルと説明文になります！
 export const metadata: Metadata = {
   title: '毎日漢検クエスト',
   description: 'Rickと一緒に毎日漢字の特訓をしよう！',
+  icons: {
+    icon: '/Rick.png',
+    apple: '/Rick.png',
+  },
 }
 
 export default function RootLayout({
