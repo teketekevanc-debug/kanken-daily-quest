@@ -15,7 +15,7 @@ const getPieColor = (index: number) => {
 };
 
 // ★ 棒グラフの角丸設定
-const BAR_RADIUS = [4, 4, 0, 0];
+const BAR_RADIUS =[4,4,0,0];
 
 type AdminScreenProps = {
   currentUser: any;
@@ -66,6 +66,27 @@ export default function AdminScreen(props: AdminScreenProps) {
   const onAddWordClick = () => {
     handleAddWord(newWord);
     setNewWord({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: 'kyu10', stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' });
+  };
+
+  // ★ 新機能：ご褒美ストックを消費する関数
+  const handleConsumeReward = async () => {
+    if ((challengeSettings.owned_rewards || 0) <= 0) {
+      alert("使えるストックがありません！");
+      return;
+    }
+    if (!confirm(`「${challengeSettings.reward_text}」を1つ使いますか？\n（ストックが1つ減ります）`)) return;
+
+    const newOwned = challengeSettings.owned_rewards - 1;
+    // 累計は減らさず、持っている数だけをSupabaseに直接更新します
+    const { supabase } = await import('@/lib/supabaseClient');
+    const { error } = await supabase.from('challenge_settings').update({ owned_rewards: newOwned }).eq('target_user_id', adminTargetUser.id);
+    
+    if (error) {
+      alert("エラーが発生しました: " + error.message);
+    } else {
+      setChallengeSettings({ ...challengeSettings, owned_rewards: newOwned });
+      alert("ご褒美ストックを1つ消費しました！🎁");
+    }
   };
 
   return (
@@ -181,7 +202,7 @@ export default function AdminScreen(props: AdminScreenProps) {
                         <XAxis dataKey="date" tick={{fontSize: 10, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
                         <YAxis tick={{fontSize: 10, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
                         <Tooltip contentStyle={{borderRadius: '15px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-<Bar dataKey="count" fill={adminTargetUser.id === 'sister' ? '#0ea5e9' : adminTargetUser.id === 'mami' ? '#ec4899' : adminTargetUser.id === 'kenta' ? '#10b981' : '#f59e0b'} radius={[4,4,0,0]} />
+                        <Bar dataKey="count" fill={adminTargetUser.id === 'sister' ? '#0ea5e9' : adminTargetUser.id === 'mami' ? '#ec4899' : adminTargetUser.id === 'kenta' ? '#10b981' : '#f59e0b'} radius={[rTopLeft, rTopRight, rBottomRight, rBottomLeft]} />
                       </BarChart>
                     </ResponsiveContainer>
                  </div>
@@ -199,9 +220,24 @@ export default function AdminScreen(props: AdminScreenProps) {
           {adminTab === 'challenge' && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
               
+              {/* ★ 新機能：ご褒美のストック管理 */}
+              <div className="bg-yellow-50/50 p-6 rounded-[2rem] border-2 border-yellow-100 shadow-sm space-y-4">
+                <h3 className="font-black text-yellow-600 flex items-center gap-2">👑 ご褒美ストック管理</h3>
+                <div className="flex items-center justify-between bg-white p-4 rounded-2xl border-2 border-yellow-100">
+                  <div>
+                    <p className="text-[10px] font-bold text-yellow-600 mb-1">現在の「{challengeSettings.reward_text || 'ご褒美'}」ストック</p>
+                    <p className="text-3xl font-black text-yellow-500">{challengeSettings.owned_rewards || 0} <span className="text-sm text-yellow-600">個</span></p>
+                    <p className="text-[10px] font-bold text-stone-400 mt-1">累計獲得: {challengeSettings.total_earned_rewards || 0} 個</p>
+                  </div>
+                  <button onClick={handleConsumeReward} className="bg-yellow-500 hover:bg-yellow-600 text-white font-black px-6 py-4 rounded-2xl shadow-md active:scale-95 transition-all">
+                    1個使う！
+                  </button>
+                </div>
+              </div>
+
               {/* ご褒美設定 */}
               <div className="bg-rose-50/50 p-6 rounded-[2rem] border-2 border-rose-100 shadow-sm space-y-4">
-                <h3 className="font-black text-rose-600 flex items-center gap-2">🎁 ご褒美設定</h3>
+                <h3 className="font-black text-rose-600 flex items-center gap-2">🎁 ご褒美の目標設定</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-black text-rose-400 block mb-1 ml-2">目標日数 (日)</label>

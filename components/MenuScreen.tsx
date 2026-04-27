@@ -1,8 +1,8 @@
 'use client'
-import React from 'react'
+import React, { useState } from 'react'
 import { USERS, CATEGORIES, MODE_NAMES, getUserFirstName, getDailyMessage } from '@/lib/constants'
 
-// Homeコンポーネントから受け取るデータと関数の「型」を定義します
+// Homeコンポーネントから受け取るデータと関数の「型」を定義
 type MenuScreenProps = {
   currentUser: any;
   setCurrentUser: (user: any) => void;
@@ -29,7 +29,7 @@ type MenuScreenProps = {
 }
 
 export default function MenuScreen(props: MenuScreenProps) {
-  // ★ プロパティも分割代入で受け取ります
+  // プロパティを分割代入で受け取り
   const { 
     currentUser, setCurrentUser, dailyProgress, challengeSettings, 
     targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode,
@@ -38,26 +38,40 @@ export default function MenuScreen(props: MenuScreenProps) {
     stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading
   } = props;
 
-  // view === 'menu' で定義されていたローカル変数を展開
-  const streak = dailyProgress?.streak || 0; 
-  const goal = challengeSettings?.reward_goal_days || 14; 
-  const rewardName = challengeSettings?.reward_text || '好きなおやつ';
+  // ★ 豆知識ノート表示用のState
+  const [showTipsModal, setShowTipsModal] = useState(false);
+
+  // 変数展開（分割代入の徹底）
+  const streakData = [dailyProgress?.streak || 0];
+  const [streak] = streakData;
+
+  const goalData = [challengeSettings?.reward_goal_days || 14];
+  const [goal] = goalData;
+
+  const rewardTextData = [challengeSettings?.reward_text || '好きなおやつ'];
+  const [rewardName] = rewardTextData;
+
+  const tipsData = [challengeSettings?.unlocked_tips || []];
+  const [unlockedTips] = tipsData;
   
-  let nextRewardMsg = "";
-  if (streak < goal) {
-      nextRewardMsg = `あと${goal - streak}日で${rewardName}！🎁`;
-  } else { 
-      const remaining = goal - (streak % goal); 
-      nextRewardMsg = (remaining === goal && streak > 0) ? `🎉 目標の${goal}日達成！${rewardName}をGET！` : `あと${remaining}日で${rewardName}！🎁`; 
-  }
+  // 次のご褒美メッセージの計算
+  const remainder = streak % goal;
+  const daysUntil = (remainder === 0 && streak > 0) ? goal : goal - remainder;
+  const nextRewardMsg = (remainder === 0 && streak > 0) 
+    ? `🎉 目標の${goal}日達成！${rewardName}をGET！` 
+    : `あと${daysUntil}日で${rewardName}！🎁`;
 
   const isRickDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['rick_challenge'] && d.result === 'done'); 
   const isParentDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['parent_challenge'] && d.result === 'done'); 
   const isWeekendDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['weekend'] && d.result === 'done'); 
-  const displayCount = challengeSettings?.quest_count || 5;
+  
+  const displayCountData = [challengeSettings?.quest_count || 5];
+  const [displayCount] = displayCountData;
 
   return (
     <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans transition-colors duration-500`}>
+      
+      {/* ユーザー切り替え */}
       <div className="absolute top-4 right-4 flex flex-wrap justify-end gap-2 max-w-[70%]">
         {USERS.map((u: any) => (
           <button key={u.id} onClick={() => setCurrentUser(u)} className={`px-3 py-1.5 rounded-full text-xs font-black transition-all shadow-sm ${currentUser.id === u.id ? `bg-gradient-to-r ${u.hue} text-white scale-110 ring-2 ring-white/50` : 'bg-white/50 text-stone-500 opacity-90 hover:bg-white'}`}>
@@ -66,12 +80,14 @@ export default function MenuScreen(props: MenuScreenProps) {
         ))}
       </div>
 
+      {/* ナビゲーターRick */}
       <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-xl mb-4 relative mt-4">
         <img src="/Rick.png" alt="Rick" className="w-full h-full object-cover" />
         <div className="absolute bottom-0 left-0 right-0 bg-stone-900/40 text-white text-[10px] text-center font-bold py-0.5 backdrop-blur-sm tracking-widest">ナビゲーター</div>
       </div>
       <h1 className={`text-3xl font-black ${currentUser.text} mb-2 tracking-widest drop-shadow-sm`}>毎日漢検クエスト</h1>
       
+      {/* 設定エリア */}
       <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">
           <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🎯</span> 出題するカテゴリ</p>
           <select value={targetKyu} onChange={e => setTargetKyu(e.target.value)} className="w-full p-3 border-2 border-stone-200 rounded-xl text-sm font-black text-stone-700 bg-stone-50 outline-none focus:border-sky-400 mb-5 text-center shadow-inner">
@@ -90,14 +106,33 @@ export default function MenuScreen(props: MenuScreenProps) {
           </div>
       </div>
       
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-5 mb-5 text-center border-b-4 border-stone-200 relative overflow-hidden">
+      {/* 👑 ご褒美・連続記録エリア */}
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-5 mb-5 border-b-4 border-stone-200 relative overflow-hidden">
           <div className="absolute -right-4 -top-4 text-6xl opacity-10">🔥</div>
           <p className="text-xs font-black text-sky-600 mb-2 animate-pulse">{getDailyMessage(currentUser.id)}</p>
-          <p className="text-xs text-stone-400 font-bold mb-1">現在の連続クリア</p>
-          <p className="text-5xl font-black text-orange-500 mb-3 tracking-tighter">{streak} <span className="text-xl">日</span></p>
-          <div className="bg-orange-50 border border-orange-200 text-orange-600 font-bold py-1.5 px-4 rounded-full text-sm inline-block shadow-sm">{nextRewardMsg}</div>
+          
+          <div className="flex justify-between items-center mb-4 px-2">
+            <div className="text-left">
+              <p className="text-[10px] text-stone-400 font-bold mb-0.5">現在の連続クリア</p>
+              <p className="text-4xl font-black text-orange-500 tracking-tighter">{streak} <span className="text-lg">日</span></p>
+            </div>
+            <div className="text-right bg-yellow-50 p-2 rounded-2xl border-2 border-yellow-100 shadow-inner min-w-[100px]">
+              <p className="text-[9px] font-black text-yellow-600 mb-0.5">持っている数</p>
+              <p className="text-2xl font-black text-yellow-500">{challengeSettings?.owned_rewards || 0} <span className="text-xs">個</span></p>
+            </div>
+          </div>
+
+          <div className="bg-orange-50 border border-orange-200 text-orange-600 font-black py-2 px-4 rounded-2xl text-sm inline-block shadow-sm w-full mb-3">
+            {nextRewardMsg}
+          </div>
+
+          {/* ★ 豆知識ノートへの入り口 */}
+          <button onClick={() => setShowTipsModal(true)} className="w-full bg-stone-800 text-white font-black py-3 rounded-xl active:scale-95 transition flex items-center justify-center gap-2 shadow-md hover:bg-stone-700">
+             <span>📚</span> 集めた豆知識を見る ({unlockedTips.length}個)
+          </button>
       </div>
 
+      {/* 復習カード */}
       {reviewCandidates.length > 0 && (
         <div className="w-full max-w-sm mb-6 animate-in slide-in-from-top duration-500">
           <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 shadow-sm relative overflow-hidden">
@@ -121,12 +156,14 @@ export default function MenuScreen(props: MenuScreenProps) {
         </div>
       )}
 
+      {/* 今日の進捗バー */}
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-6 mb-6 relative border-2 border-stone-50">
         <div className="flex items-center justify-between mb-3"><span className="text-stone-500 font-bold text-sm">📅 今日の進捗</span><span className={`text-2xl font-black ${currentUser.text}`}>{dailyProgress?.count || 0} <span className="text-base text-stone-400">/ {displayCount} 問</span></span></div>
         <div className="w-full bg-stone-100 rounded-full h-5 shadow-inner p-0.5"><div className={`h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${currentUser.hue}`} style={{ width: `${Math.min(((dailyProgress?.count || 0) / displayCount) * 100, 100)}%` }}></div></div>
         {dailyProgress?.is_completed ? <p className="text-center text-orange-500 font-bold mt-3 animate-bounce">💮 今日のノルマ達成！えらい！</p> : <p className="text-center text-stone-400 text-xs mt-3 font-bold">目標まであと {Math.max(0, displayCount - (dailyProgress?.count || 0))} 問！</p>}
       </div>
       
+      {/* メインアクションボタン */}
       <div className="space-y-3 w-full max-w-sm mb-6">
         {hasParentChallenge && (
           <button onClick={() => { if (!isParentDone) startGame('parent_challenge'); }} className={`w-full py-4 px-6 rounded-2xl font-black shadow-lg transform transition-all flex items-center justify-between ${isParentDone ? 'bg-stone-200 text-white shadow-none' : 'bg-gradient-to-r from-rose-500 to-orange-500 text-white animate-pulse active:scale-95'}`}>
@@ -140,6 +177,7 @@ export default function MenuScreen(props: MenuScreenProps) {
           {dailyProgress?.is_completed ? <span className="bg-white/30 px-3 py-1 rounded-full text-xs">クリア済</span> : <span className="bg-white/30 px-3 py-1 rounded-full text-sm">{displayCount}問</span>}
         </button>
         
+        {/* Rickの特訓 */}
         <div className={`w-full p-4 rounded-2xl shadow-md border-2 transition-all ${isRickDone ? 'bg-stone-100 border-stone-200' : 'bg-white border-stone-100'}`}>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2"><span className="text-xl">⚡</span> <span className={`font-bold ${isRickDone ? 'text-stone-400' : 'text-stone-700'}`}>Rickの特訓</span></div>
@@ -147,7 +185,7 @@ export default function MenuScreen(props: MenuScreenProps) {
             </div>
             <div className="flex gap-1 mb-3">
                 <button onClick={() => setRickMode('read')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'read' ? 'bg-orange-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>👀 読む</button>
-                <button onClick={() => setRickMode('think')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'think' ? 'bg-sky-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>🧠 思い浮かべる</button>
+                <button onClick={() => setRickMode('think')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'think' ? 'bg-sky-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>🧠 思い</button>
                 <button onClick={() => setRickMode('write')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'write' ? 'bg-emerald-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>✍️ 手書き</button>
             </div>
             <button onClick={() => { if (!isRickDone) startGame('rick_challenge'); }} className={`w-full py-3 rounded-xl font-black text-sm tracking-widest transition-all ${isRickDone ? 'bg-stone-200 text-white cursor-not-allowed' : 'bg-stone-800 text-white shadow-md active:scale-95 hover:bg-stone-700'}`}>特訓スタート！</button>
@@ -161,18 +199,59 @@ export default function MenuScreen(props: MenuScreenProps) {
         <button onClick={() => startGame('revenge')} className="w-full py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-stone-800 text-rose-400 border-b-4 border-stone-900 hover:bg-stone-700 active:translate-y-1 active:border-b-0 tracking-widest gap-2"><span className="text-xl">💀</span> リベンジ (無限復習)</button>
 
         <div className="flex space-x-3 mt-4">
-          <button onClick={fetchCollection} className="flex-1 bg-white border-b-4 border-emerald-500 text-emerald-600 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2"><span className="text-xl">📖</span> 言葉の図鑑</button>
-          <button onClick={() => startGame('free')} className="flex-1 bg-white border-b-4 border-sky-400 text-sky-500 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2"><span className="text-xl">⚔️</span> フリー</button>
+          <button onClick={fetchCollection} className="flex-1 bg-white border-b-4 border-emerald-500 text-emerald-600 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">📖</span> 図鑑</button>
+          <button onClick={() => startGame('free')} className="flex-1 bg-white border-b-4 border-sky-400 text-sky-500 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">⚔️</span> フリー</button>
         </div>
       </div>
+
+      {/* カレンダー */}
       <div className="mb-6 w-full max-w-sm">{renderCalendar()}</div>
+
+      {/* パパ・ママからのお返事 */}
       {dailyProgress?.parent_reply && (
         <div className="mb-8 w-full max-w-sm bg-white border-4 border-orange-200 rounded-3xl p-6 shadow-lg relative">
           <div className="absolute -top-4 left-6 bg-orange-400 text-white text-xs font-black tracking-widest px-4 py-1.5 rounded-full shadow-sm">パパ・ママからのお返事</div>
           <p className="text-left text-base font-bold text-stone-700 whitespace-pre-wrap leading-relaxed mt-2">「{dailyProgress.parent_reply}」</p>
         </div>
       )}
-      <button onClick={() => { stopSpeaking(); fetchAdminStats(currentUser); setAdminTargetUser(currentUser); }} className="mb-8 bg-stone-300 hover:bg-stone-400 text-stone-600 font-bold py-3 px-8 rounded-full w-full max-w-xs shadow-sm text-sm transition">👨‍👩‍👧‍👦 保護者メニューへ</button>
+
+      <button onClick={() => { stopSpeaking(); fetchAdminStats(currentUser); setAdminTargetUser(currentUser); setView('admin'); }} className="mb-8 bg-stone-300 hover:bg-stone-400 text-stone-600 font-bold py-3 px-8 rounded-full w-full max-w-xs shadow-sm text-sm transition">👨‍👩‍👧‍👦 保護者メニューへ</button>
+
+      {/* ==========================================
+          ★ 豆知識ノート（モーダル画面）
+      ========================================== */}
+      {showTipsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in" onClick={() => setShowTipsModal(false)}>
+          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            
+            <div className="bg-yellow-50 p-6 text-center border-b-4 border-yellow-100 shrink-0">
+              <h3 className="text-2xl font-black text-yellow-600 flex items-center justify-center gap-2"><span>📚</span> 秘密の豆知識ノート</h3>
+              <p className="text-xs font-bold text-yellow-700 mt-2">今まで集めた知識：{unlockedTips.length}個</p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto bg-stone-50 flex-1 space-y-3 no-scrollbar">
+              {unlockedTips.length > 0 ? (
+                unlockedTips.map((tip: string, i: number) => (
+                  <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-stone-100">
+                    <p className="text-sm font-bold text-stone-700 leading-relaxed">{tip}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10">
+                  <p className="text-4xl mb-4">🔒</p>
+                  <p className="text-stone-400 font-bold leading-relaxed">まだ豆知識がありません。<br/>10分しっかり勉強して<br/>クリア後の宝箱を開けよう！</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 bg-white border-t border-stone-100 shrink-0">
+              <button onClick={() => setShowTipsModal(false)} className="w-full py-4 bg-stone-800 text-white rounded-2xl font-black text-lg shadow-lg active:scale-95 transition">村へもどる 🐾</button>
+            </div>
+            
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

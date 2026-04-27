@@ -10,12 +10,12 @@ type CollectionScreenProps = {
     renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
     getFullReading: (reading: string, okurigana?: string | null) => string;
     stopSpeaking: () => void;
+    onViewCard?: () => void; // ★ 新規追加：カードを開いたことを親に伝える関数
 };
 
 export default function CollectionScreen(props: CollectionScreenProps) {
-    const { currentUser, setView, allWordsList, speakWord, renderReading, getFullReading, stopSpeaking } = props;
+    const { currentUser, setView, allWordsList, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard } = props;
     
-    // 図鑑の中だけで使うState
     const [collectionTab, setCollectionTab] = useState('kyu5');
     const [childCommentInput, setChildCommentInput] = useState('');
     const [flashcardMode, setFlashcardMode] = useState<'normal'|'hide_kanji'|'hide_reading'>('normal');
@@ -32,6 +32,9 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             setRevealedCards(revealedCards.filter(rid => rid !== w.id)); 
             stopSpeaking();
         } else {
+            // ★ 新規追加：新しくカードを開いた時にカウントアップ
+            if (onViewCard) onViewCard();
+            
             setRevealedCards([...revealedCards, w.id]);
             const parts = [getFullReading(w.reading, w.okurigana)];
             if (w.usage_example) parts.push(w.usage_example);
@@ -49,14 +52,12 @@ export default function CollectionScreen(props: CollectionScreenProps) {
               <h2 className="text-2xl font-black text-stone-700">📖 言葉の図鑑</h2>
             </div>
   
-            {/* 級選択タブ */}
             <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar mb-4">
               {CATEGORIES.map((cat: any) => (
                 <button key={cat.id} onClick={() => setCollectionTab(cat.id)} className={`px-6 py-3 rounded-full text-md font-black whitespace-nowrap transition-all shadow-sm ${collectionTab === cat.id ? 'bg-emerald-600 text-white scale-105' : 'bg-white text-stone-500'}`}>{cat.name}</button>
               ))}
             </div>
   
-            {/* 検索・モード切替 */}
             <div className="bg-white rounded-3xl p-5 shadow-md border-2 border-stone-100 mb-6">
               <input type="text" placeholder="漢字や読みで検索..." className="w-full bg-stone-50 border-2 border-stone-100 rounded-2xl py-3 px-5 mb-4 font-bold text-lg outline-none focus:border-emerald-400 text-stone-700" value={childCommentInput} onChange={(e) => setChildCommentInput(e.target.value)} />
               <div className="grid grid-cols-3 gap-3 p-1 bg-stone-100 rounded-2xl">
@@ -66,7 +67,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
               </div>
             </div>
   
-            {/* カード一覧 */}
             <div className="grid grid-cols-3 gap-3">
               {filteredWords.map((w) => (
                 <div key={w.id} onClick={() => toggleCardReveal(w)} className="bg-white rounded-3xl p-3 border-b-4 border-stone-200 shadow-sm flex flex-col items-center justify-center relative aspect-square cursor-pointer active:scale-95 transition-transform overflow-hidden">
@@ -89,7 +89,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             </div>
           </div>
   
-          {/* 詳細表示モーダル（完全復元） */}
           {revealedCards.length > 0 && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-md animate-in fade-in" onClick={() => setRevealedCards([])}>
               {allWordsList.filter(x => revealedCards.includes(x.id)).map(sw => (
