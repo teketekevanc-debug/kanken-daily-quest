@@ -1,4 +1,4 @@
-iexport const MINECRAFT_TRIVIA = [
+export const MINECRAFT_TRIVIA = [
   { id: "mc_001", category: "サバイバル", title: "無限水源の作り方", content: "2x2の穴を掘り、斜めに向かい合う2つの角に水を流すと、何度汲んでも水がなくならない「無限水源」ができるぞ！" },
   { id: "mc_002", category: "裏技", title: "クリーパーの爆発回避", content: "クリーパーが爆発する瞬間、自分とクリーパーの間にブロックを1つ置くだけで、受けるダメージを劇的に減らすことができる！" },
   { id: "mc_003", category: "Mob", title: "クリーパーの弱点", content: "クリーパーは「ネコ（ヤマネコ）」がとっても苦手！ネコを連れて歩くか、家の周りに座らせておけばクリーパーは近寄ってこないぞ。" },
