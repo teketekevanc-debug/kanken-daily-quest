@@ -126,10 +126,35 @@ export default function MenuScreen(props: MenuScreenProps) {
             {nextRewardMsg}
           </div>
 
+          {/* ご褒美ルールの説明（折りたたみ） */}
+<div className="mt-3 border-t border-stone-100 pt-3">
+  <details className="group">
+    <summary className="list-none cursor-pointer">
+      <div className="text-[10px] font-black text-stone-400 flex items-center justify-center gap-1 group-open:text-sky-500 transition-colors">
+        <span>📜</span> ご褒美をもらうためのヒント {/* ぼかした表現 */}
+        <span className="transition-transform group-open:rotate-180">▼</span>
+      </div>
+    </summary>
+    <div className="mt-2 bg-stone-50 p-3 rounded-xl text-[11px] font-bold text-stone-600 leading-relaxed text-left animate-in fade-in slide-in-from-top-1">
+      <p>・しっかり集中して、漢字の世界を冒険しよう！</p>
+      <p>・10分くらい、問題を解いたり図鑑をながめていると、クリアしたあとに宝箱が出るかも...？</p>
+      <p>・「手書き」や「自己判定」で頑張ると、いいことがあるかも！？</p>
+      <p className="text-[9px] text-stone-400 mt-2">※ 途中で画面を閉じると、時間はリセットされるから注意してね！</p>
+    </div>
+  </details>
+</div>
+
           {/* ★ 豆知識ノートへの入り口 */}
-          <button onClick={() => setShowTipsModal(true)} className="w-full bg-stone-800 text-white font-black py-3 rounded-xl active:scale-95 transition flex items-center justify-center gap-2 shadow-md hover:bg-stone-700">
-             <span>📚</span> 集めた豆知識を見る ({unlockedTips.length}個)
-          </button>
+          <button 
+  onClick={() => setShowTipsModal(true)} 
+  className="w-full bg-gradient-to-b from-amber-700 to-amber-900 text-amber-100 font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center gap-3 shadow-[0_5px_0_0_rgba(69,26,3,1)] hover:brightness-110 mb-2"
+>
+  <span className="text-2xl">🎁</span>
+  <div className="text-left leading-tight">
+    <p className="text-[10px] text-amber-300/80">あつめたお宝</p>
+    <p className="text-sm tracking-widest">豆知識コレクション ({unlockedTips.length})</p>
+  </div>
+</button>
       </div>
 
       {/* 復習カード */}
@@ -215,7 +240,16 @@ export default function MenuScreen(props: MenuScreenProps) {
         </div>
       )}
 
-      <button onClick={() => { stopSpeaking(); fetchAdminStats(currentUser); setAdminTargetUser(currentUser); setView('admin'); }} className="mb-8 bg-stone-300 hover:bg-stone-400 text-stone-600 font-bold py-3 px-8 rounded-full w-full max-w-xs shadow-sm text-sm transition">👨‍👩‍👧‍👦 保護者メニューへ</button>
+    
+{/* 保護者（kenta, mami）のみに表示される入り口 */}
+{(currentUser.id === 'kenta' || currentUser.id === 'mami') && (
+  <button 
+    onClick={() => { stopSpeaking(); fetchAdminStats(currentUser); setAdminTargetUser(currentUser); setView('admin'); }} 
+    className="mb-8 bg-stone-800 hover:bg-stone-900 text-white font-black py-4 px-8 rounded-2xl w-full max-w-xs shadow-xl text-sm transition-all active:scale-95 border-b-4 border-stone-950 flex items-center justify-center gap-2"
+  >
+    <span>👨‍👩‍👧‍👦</span> 保護者管理メニュー
+  </button>
+)}
 
       {/* ==========================================
           ★ 豆知識ノート（モーダル画面）

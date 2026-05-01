@@ -48,7 +48,10 @@ export default function Home() {
   const [dailyProgress, setDailyProgress] = useState<any>({ id: 0, date: getTodayJST(), count: 0, is_completed: false, study_time_seconds: 0, collection_views: 0 })
   const [monthlyLogs, setMonthlyLogs] = useState<any[]>([]); 
   const [stats, setStats] = useState<ProgressStats | null>(null)
+  
+  // Rickの挑戦状（復習カード）用ステート
   const [reviewCandidates, setReviewCandidates] = useState<KanjiWord[]>([])
+  const [reviewRevealed, setReviewRevealed] = useState<number[]>([]);
 
   // --- ゲーム進行ステート ---
   const [currentGameGoal, setCurrentGameGoal] = useState(5); 
@@ -106,31 +109,52 @@ export default function Home() {
     );
   }, []);
 
+  // カードの表裏を切り替える関数
+  const toggleReviewReveal = useCallback((id: number) => {
+    setReviewRevealed((prev) => {
+        if (prev.includes(id)) {
+            const [ ...rest ] = prev.filter(rid => rid !== id);
+            return rest;
+        }
+        return [...prev, id];
+    });
+  }, []);
+
   // --- データ取得ロジック ---
   const checkDailyProgress = useCallback(async () => {
     const today = getTodayJST();
     const yesterday = getYesterdayJST();
     const { data } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
+    
+    // 前日のストリークを取得
+    const { data: yLog } = await supabase.from('daily_logs').select('streak, is_completed').eq('user_id', currentUser.id).eq('date', yesterday).single();
+    const yesterdayStreak = (yLog?.is_completed) ? (yLog.streak || 0) : 0;
+
     if (data) {
-        const { data: yLog } = await supabase.from('daily_logs').select('streak, is_completed').eq('user_id', currentUser.id).eq('date', yesterday).single();
-        setDailyProgress({ ...data, streak: (yLog?.is_completed) ? (yLog.streak || 0) : 0 });
+        setDailyProgress({ ...data, streak: yesterdayStreak });
     } else {
-        const { data: yLog } = await supabase.from('daily_logs').select('streak, is_completed').eq('user_id', currentUser.id).eq('date', yesterday).single();
-        setDailyProgress({ id: 0, date: today, count: 0, is_completed: false, details: [], streak: (yLog?.is_completed) ? (yLog.streak || 0) : 0, study_time_seconds: 0, collection_views: 0 });
+        setDailyProgress({ id: 0, date: today, count: 0, is_completed: false, details: [], streak: yesterdayStreak, study_time_seconds: 0, collection_views: 0 });
     }
   }, [currentUser.id]);
 
-  const fetchMonthlyLogs = useCallback(async (targetDate: Date) => {
+  // ★ カレンダー用ログ取得（userId引数を追加し、連動を可能にする）
+  const fetchMonthlyLogs = useCallback(async (targetDate: Date, userId: string = currentUser.id) => {
     const y = targetDate.getFullYear();
     const m = targetDate.getMonth();
     const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
     const last = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
-    const { data } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).gte('date', first).lte('date', last);
+    const { data } = await supabase.from('daily_logs').select('*').eq('user_id', userId).gte('date', first).lte('date', last);
     if (data) setMonthlyLogs(data);
   }, [currentUser.id]);
 
+  // ★ 管理者統計取得（カレンダー連動を統合）
   const fetchAdminStats = useCallback(async (targetUser: any) => {
     setLoading(true);
+    
+    // 1. カレンダーのログを子供のものに切り替える
+    await fetchMonthlyLogs(calendarDate, targetUser.id);
+
+    // 2. 漢字習得状況の取得
     const { count: totalCount } = await supabase.from('kanji_questions').select('*', { count: 'exact', head: true }).eq('target_user', targetUser.db_target);
     const { data: progress } = await supabase.from('user_progress').select('status, mistake_count, question_id, kanji_questions(kanji, reading, okurigana)').eq('user_id', targetUser.id);
     
@@ -146,9 +170,19 @@ export default function Home() {
     ranks.learning = Math.max(0, (totalCount || 0) - ranks.gold - ranks.silver - ranks.bronze);
     weakList.sort((a, b) => b.mistakes - a.mistakes);
 
+    // 3. 学習推移グラフ用データの取得
     const thirtyDaysAgo = getJSTDate(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const { data: logD } = await supabase.from('daily_logs').select('*').eq('user_id', targetUser.id).gte('date', formatDate(thirtyDaysAgo)).order('date', { ascending: true });
     
+    // ★ 救済措置用の streak 初期値セット（反転させて先頭＝最新を取得）
+    if (logD && logD.length > 0) {
+        const [...reversedLogs] = [...logD].reverse();
+        const [lastLog] = reversedLogs;
+        setEditStreak(lastLog?.streak || 0);
+    } else {
+        setEditStreak(0);
+    }
+
     setStats({
         total: totalCount || 0,
         mastered: ranks.gold,
@@ -168,7 +202,7 @@ export default function Home() {
     const { data: challenge } = await supabase.from('challenge_settings').select('*').eq('target_user_id', targetUser.id).single();
     if (challenge) setChallengeSettings(challenge);
     setLoading(false);
-  }, [getFullReading]);
+  }, [calendarDate, fetchMonthlyLogs, getFullReading]);
 
   const fetchAllWordsForEdit = useCallback(async () => {
     const { data: words } = await supabase.from('kanji_questions').select('*').eq('target_user', adminTargetUser.db_target).order('id', { ascending: false });
@@ -180,7 +214,6 @@ export default function Home() {
     }
   }, [adminTargetUser.db_target, adminTargetUser.id]);
 
-  // --- 管理者アクション関数 (ここが修正のポイント) ---
   const saveChallengeSettings = useCallback(async (settings: any) => {
     setChallengeSettings(settings);
     const { error } = await supabase.from('challenge_settings').upsert({ target_user_id: adminTargetUser.id, ...settings, updated_at: new Date().toISOString() }, { onConflict: 'target_user_id' });
@@ -237,28 +270,55 @@ export default function Home() {
     
     const nextLMode = (selectedInputMode === 'typing_read') ? 'kanji_to_read' : 'read_to_kanji';
     setLangMode(nextLMode);
-
-    if (nextLMode === 'read_to_kanji') {
-      speakWord(getFullReading(word.reading, word.okurigana));
-    }
-
+    
     const others = allWords.filter(w => w.id !== word.id).sort(() => 0.5 - Math.random()).slice(0, 3);
     setOptions([word, ...others].sort(() => 0.5 - Math.random()));
-  }, [selectedInputMode, speakWord, getFullReading]);
+  }, [selectedInputMode]);
 
   const startGame = async (selectedMode: any) => {
-    setLoading(true); setMode(selectedMode); setOpenedChests([]); setMistakeCount(0);
+    setLoading(true); 
+    setMode(selectedMode); 
+    setOpenedChests([]); 
+    setMistakeCount(0);
+    
+    if (selectedMode === 'daily') {
+      setSelectedInputMode('write_self');
+    }
+
     const limit = selectedMode === 'weekend' ? (challengeSettings.special_quest_count || 10) : (challengeSettings.quest_count || 5);
     setCurrentGameGoal(limit);
     
     const { data: allW } = await supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target);
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id);
+
     if (!allW?.length) { setLoading(false); return; }
     
     setCachedAllWords(allW);
-    const queue = [...allW].sort(() => 0.5 - Math.random()).slice(0, limit);
-    setQuestQueue(queue); setCurrentIndex(0); 
-    prepareQuestion(queue[0], allW);
-    setView('game'); setLoading(false);
+
+    let queue;
+    if (selectedMode === 'daily') {
+      const statusMap = new Map(progress?.map(p => [p.question_id, p.status]));
+      const statusOrder: Record<string, number> = { gold: 0, silver: 1, bronze: 2, learning: 3 };
+
+      queue = [...allW].sort((a, b) => {
+        const rankA = statusOrder[statusMap.get(a.id) || 'learning'];
+        const rankB = statusOrder[statusMap.get(b.id) || 'learning'];
+        if (rankA !== rankB) return rankA - rankB;
+        return 0.5 - Math.random();
+      }).slice(0, limit);
+    } else {
+      queue = [...allW].sort(() => 0.5 - Math.random()).slice(0, limit);
+    }
+
+    setQuestQueue(queue); 
+    setCurrentIndex(0); 
+    
+    const [ firstWord ] = queue;
+    if (firstWord) {
+      prepareQuestion(firstWord, allW);
+    }
+    setView('game'); 
+    setLoading(false);
   };
 
   const updateProgress = async (id: number, correct: boolean) => {
@@ -335,30 +395,66 @@ export default function Home() {
   };
 
   const nextQuestion = useCallback(async () => {
-    setIsTransitioning(true); stopSpeaking(); 
+    setIsTransitioning(true); 
+    stopSpeaking(); 
+    
     const nextIdx = currentIndex + 1;
+    
     if (nextIdx >= questQueue.length) {
         playSound('clear');
+        
         if (mode === 'daily') {
-            const { data: yLog } = await supabase.from('daily_logs').select('streak').eq('user_id', currentUser.id).eq('date', getYesterdayJST()).single();
+            const yesterday = getYesterdayJST();
+            const { data: yLog } = await supabase.from('daily_logs').select('streak').eq('user_id', currentUser.id).eq('date', yesterday).single();
             const newStreak = (yLog?.streak || 0) + 1;
+            
             await supabase.from('daily_logs').update({ is_completed: true, streak: newStreak }).eq('user_id', currentUser.id).eq('date', getTodayJST());
+
+            const goal = challengeSettings.reward_goal_days || 14;
+            if (newStreak > 0 && newStreak % goal === 0) {
+                const newOwned = (challengeSettings.owned_rewards || 0) + 1;
+                const newTotal = (challengeSettings.total_earned_rewards || 0) + 1;
+                
+                await supabase.from('challenge_settings').update({ 
+                    owned_rewards: newOwned,
+                    total_earned_rewards: newTotal
+                }).eq('target_user_id', currentUser.id);
+                
+                setChallengeSettings((prev: any) => ({ 
+                    ...prev, 
+                    owned_rewards: newOwned, 
+                    total_earned_rewards: newTotal 
+                }));
+            }
         }
+
         const tSec = dailyProgress.study_time_seconds || 0;
-        let cCount = tSec >= 600 ? (1 + Math.floor((tSec - 600) / 300)) : 0;
-        if (['write_canvas', 'write_self'].includes(selectedInputMode)) cCount *= 2;
+        const isWritingMode = ['write_canvas', 'write_self'].includes(selectedInputMode);
+        const threshold = isWritingMode ? 300 : 600; 
+        
+        let cCount = tSec >= threshold ? (1 + Math.floor((tSec - threshold) / 300)) : 0;
+        if (isWritingMode) {
+          cCount *= 2;
+        }
         
         const { data: tips } = await supabase.from(currentUser.defaultTipTable).select('content');
-        setRewardTipsList(tips?.map(t => t.content).sort(() => 0.5 - Math.random()).slice(0, Math.min(10, cCount)) || []);
+        const allTips = tips?.map(t => t.content) || [];
+        const [ ...shuffledTips ] = allTips.sort(() => 0.5 - Math.random());
+        
+        setRewardTipsList(shuffledTips.slice(0, Math.min(10, cCount)));
         setView('result');
+
     } else {
         setCurrentIndex(nextIdx);
-        prepareQuestion(questQueue[nextIdx], cachedAllWords);
+        const [ nextWord ] = questQueue.slice(nextIdx, nextIdx + 1);
+        if (nextWord) {
+            prepareQuestion(nextWord, cachedAllWords);
+        }
     }
     setIsTransitioning(false);
-  }, [currentIndex, questQueue, cachedAllWords, dailyProgress.study_time_seconds, mode, currentUser, prepareQuestion, stopSpeaking, selectedInputMode, playSound]);
+  }, [currentIndex, questQueue, cachedAllWords, dailyProgress.study_time_seconds, mode, currentUser, prepareQuestion, stopSpeaking, selectedInputMode, playSound, challengeSettings]);
 
-  // --- カレンダー描画関数 ---
+  // --- カレンダー描画 ---
   const renderCalendar = useCallback(() => {
     const y = calendarDate.getFullYear();
     const m = calendarDate.getMonth();
@@ -405,6 +501,27 @@ export default function Home() {
         setHasParentChallenge(chal.mode === 'manual' ? (chal.selected_ids?.length > 0) : (chal.auto_count > 0));
         setChallengeSettings(chal);
       }
+
+      // Rickからの挑戦状（苦手な漢字5件）の取得
+      const { data: weakData } = await supabase
+          .from('user_progress')
+          .select('question_id, mistake_count')
+          .eq('user_id', currentUser.id)
+          .gt('mistake_count', 0)
+          .order('mistake_count', { ascending: false })
+          .limit(5);
+
+      if (weakData && weakData.length > 0) {
+          const ids = weakData.map(w => w.question_id);
+          const { data: weakWords } = await supabase.from('kanji_questions').select('*').in('id', ids);
+          
+          if (weakWords) {
+              const sortedWeak = ids.map(id => weakWords.find(w => w.id === id)).filter(Boolean) as KanjiWord[];
+              setReviewCandidates(sortedWeak);
+          }
+      } else {
+          setReviewCandidates([]);
+      }
     };
     init();
   }, [currentUser.id, calendarDate, view, fetchMonthlyLogs, checkDailyProgress]);
@@ -420,9 +537,11 @@ export default function Home() {
   const navTo = (v: any) => { stopSpeaking(); setShowRick(false); setView(v); };
 
   // --- メインレンダリング ---
-  if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates: [], reviewRevealed: [], toggleReviewReveal: ()=>{}, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(); }, renderCalendar, stopSpeaking, fetchAdminStats: (u) => { fetchAdminStats(u); setAdminTargetUser(u); setView('admin'); }, setAdminTargetUser, renderReading}} />;
+  if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading}} />;
+  
   if (view === 'admin') return <AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />;
-  if (view === 'collection') return <CollectionScreen {...{currentUser, setView: navTo, allWordsList, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }}} />;
+  
+  if (view === 'collection') return <CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }}} />;
   
   if (view === 'game' || view === 'rick_challenge') return (
     <GameScreen 
@@ -434,7 +553,7 @@ export default function Home() {
         feedbackMsg, options, userAnswer, setUserAnswer, isListening, isDrawing: false, 
         canvasRef, startDrawing: ()=>{}, draw: ()=>{}, stopDrawing: ()=>{}, clearCanvas: ()=>{}, 
         startListening: () => setIsListening(!isListening), checkAnswer, 
-        handleSelfJudge: async(c:boolean)=>{ const w=questQueue[currentIndex]; await updateProgress(w.id, c); nextQuestion(); }, 
+        handleSelfJudge: async(c:boolean)=>{ const [w]=questQueue.slice(currentIndex, currentIndex+1); await updateProgress(w.id, c); nextQuestion(); }, 
         nextQuestion, stopSpeaking, setView: navTo, renderReading, speakWord, getFullReading
       }} 
     />
@@ -443,40 +562,55 @@ export default function Home() {
   if (view === 'result') {
     const isRRoom = rewardTipsList.length > 0;
     const tS = dailyProgress.study_time_seconds || 0;
-    const progP = Math.min(100, (tS / 600) * 100);
+    const isWritingMode = ['write_canvas', 'write_self'].includes(selectedInputMode);
+    const threshold = isWritingMode ? 300 : 600;
+    const progP = Math.min(100, (tS / threshold) * 100);
+    const remainingMin = Math.ceil(Math.max(0, threshold - tS) / 60);
 
     return (
-        <div className={`min-h-screen ${isRRoom ? 'bg-slate-900' : currentUser.light} flex flex-col items-center justify-center p-6 text-center font-sans`}>
+        <div className={`min-h-screen ${isRRoom ? 'bg-slate-950' : currentUser.light} flex flex-col items-center justify-center p-6 text-center font-sans transition-colors duration-1000`}>
             {isRRoom ? (
-                <div className="w-full max-w-lg">
-                    <h2 className="text-3xl font-black text-yellow-400 mb-6">✨ ご褒美部屋 ✨</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-                        {rewardTipsList.map((tip, idx) => (
-                            <div key={idx} onClick={async () => {
-                                if(!openedChests.includes(idx)) {
-                                    playSound('chest'); setOpenedChests([...openedChests, idx]); confetti({ particleCount: 30 });
-                                    const nU = [...(challengeSettings?.unlocked_tips || []), tip];
-                                    setChallengeSettings((p:any) => ({...p, unlocked_tips: nU}));
-                                    await supabase.from('challenge_settings').update({ unlocked_tips: nU }).eq('target_user_id', currentUser.id);
-                                }
-                            }} className={`p-4 rounded-3xl border-2 transition-all cursor-pointer ${openedChests.includes(idx) ? 'bg-slate-800 border-slate-700' : 'bg-slate-800 border-yellow-500 shadow-lg'}`}>
-                                <div className="text-5xl mb-2">{openedChests.includes(idx) ? '🎁' : '📦'}</div>
-                                <p className="text-xs font-bold text-sky-300 break-words">{openedChests.includes(idx) ? tip : 'TAP!'}</p>
-                            </div>
-                        ))}
+                <div className="w-full max-w-lg animate-in fade-in zoom-in duration-700">
+                    <div className="mb-8 text-left">
+                        <h2 className="text-4xl font-black text-yellow-400 mb-2">✨ 秘密の宝物庫 ✨</h2>
+                        <p className="text-sky-300 font-bold text-sm tracking-widest">宝箱をタップして豆知識を手にいれよう！</p>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-5 mb-10">
+                        {rewardTipsList.map((tip, idx) => {
+                            const isOpened = openedChests.includes(idx);
+                            return (
+                                <div key={idx} onClick={async () => {
+                                    if(!isOpened) {
+                                        playSound('chest'); setOpenedChests([...openedChests, idx]); confetti({ particleCount: 30 });
+                                        const currentTips = challengeSettings?.unlocked_tips || [];
+                                        if (!currentTips.includes(tip)) {
+                                            const nextTips = [...currentTips, tip];
+                                            setChallengeSettings((p:any) => ({...p, unlocked_tips: nextTips}));
+                                            await supabase.from('challenge_settings').update({ unlocked_tips: nextTips }).eq('target_user_id', currentUser.id);
+                                        }
+                                    }
+                                }} className={`relative p-5 rounded-[2.5rem] border-2 transition-all duration-500 cursor-pointer transform active:scale-90 ${isOpened ? 'bg-slate-900/50 border-slate-800 scale-95 shadow-inner' : 'bg-gradient-to-b from-slate-800 to-slate-900 border-yellow-500/50 shadow-lg'}`}>
+                                    {!isOpened && <div className="absolute inset-0 bg-yellow-400/5 rounded-[2.5rem] animate-pulse"></div>}
+                                    <div className={`text-6xl mb-3 ${isOpened ? 'rotate-12 scale-110' : ''}`}>{isOpened ? '🎁' : '📦'}</div>
+                                    <p className={`text-[11px] font-black transition-colors ${isOpened ? 'text-sky-200' : 'text-yellow-600'}`}>{isOpened ? tip : '開ける！'}</p>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             ) : (
-                <div className="bg-white rounded-[3rem] shadow-2xl p-8 w-full max-w-sm border-4 border-stone-200">
-                    <h2 className="text-3xl font-black text-emerald-500 mb-4">クリア！👏</h2>
-                    <img src="/Rick.png" alt="Rick" className="w-24 h-24 mx-auto rounded-full mb-6 shadow-md" />
-                    <div className="bg-stone-50 p-5 rounded-2xl mb-6 text-left border-2 border-stone-100">
-                        <p className="text-xs font-bold text-stone-500 mb-4">あと {Math.floor(Math.max(0, 600 - tS)/60)}分 の学習でトビラが開くワン！</p>
-                        <div className="w-full bg-stone-200 rounded-full h-3 overflow-hidden"><div className="bg-emerald-400 h-3 transition-all" style={{ width: `${progP}%` }}></div></div>
+                <div className="bg-white rounded-[3.5rem] shadow-2xl p-10 w-full max-w-sm border-4 border-stone-100">
+                    <h2 className="text-4xl font-black text-emerald-500 mb-6">QUEST CLEAR!</h2>
+                    <div className="relative w-32 h-32 mx-auto mb-8">
+                        <img src="/Rick.png" alt="Rick" className="w-full h-full rounded-full shadow-lg border-4 border-white object-cover" />
+                    </div>
+                    <div className="bg-stone-50 p-6 rounded-3xl mb-8 text-left border-2 border-stone-100">
+                        <p className="text-sm font-black text-stone-700 leading-tight mb-4">あと <span className="text-2xl text-orange-500 mx-0.5">{remainingMin}</span> 分 の学習で<br/>お宝へのトビラが開くワン！🐾</p>
+                        <div className="w-full bg-stone-200 rounded-full h-4 shadow-inner p-1"><div className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full rounded-full transition-all" style={{ width: `${progP}%` }}></div></div>
                     </div>
                 </div>
             )}
-            <button onClick={() => setView('menu')} className={`mt-8 w-full max-w-sm ${isRRoom ? 'bg-slate-700' : 'bg-stone-800'} text-white font-black py-4 rounded-2xl shadow-lg`}>村へもどる 🐾</button>
+            <button onClick={() => setView('menu')} className={`mt-8 w-full max-w-sm py-5 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 border-b-8 ${isRRoom ? 'bg-slate-800 text-white' : 'bg-stone-800 text-white'}`}>村へもどる 🐾</button>
         </div>
     );
   }
