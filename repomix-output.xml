@@ -1,0 +1,2551 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+app/archive/page.tsx
+app/favicon.ico
+app/globals.css
+app/layout.tsx
+app/page.tsx
+components/AdminScreen.tsx
+components/CollectionScreen.tsx
+components/GameScreen.tsx
+components/MenuScreen.tsx
+eslint.config.mjs
+lib/constants.ts
+lib/supabaseClient.ts
+lib/trivia.ts
+next.config.ts
+package.json
+postcss.config.mjs
+public/file.svg
+public/globe.svg
+public/next.svg
+public/Rick.png
+public/sounds/clear.mp3
+public/sounds/correct.mp3
+public/sounds/wrong.mp3
+public/vercel.svg
+public/window.svg
+README.md
+tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+.vercel
+</file>
+
+<file path="app/globals.css">
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+</file>
+
+<file path="eslint.config.mjs">
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+</file>
+
+<file path="lib/supabaseClient.ts">
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+};
+
+export default nextConfig;
+</file>
+
+<file path="package.json">
+{
+  "name": "kanken-daily-quest",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
+    "canvas-confetti": "^1.9.4",
+    "next": "16.1.6",
+    "next-pwa": "^5.6.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "^3.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
+</file>
+
+<file path="postcss.config.mjs">
+const config = {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+
+export default config;
+</file>
+
+<file path="public/file.svg">
+<svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
+</file>
+
+<file path="public/globe.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
+</file>
+
+<file path="public/next.svg">
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 394 80"><path fill="#000" d="M262 0h68.5v12.7h-27.2v66.6h-13.6V12.7H262V0ZM149 0v12.7H94v20.4h44.3v12.6H94v21h55v12.6H80.5V0h68.7zm34.3 0h-17.8l63.8 79.4h17.9l-32-39.7 32-39.6h-17.9l-23 28.6-23-28.6zm18.3 56.7-9-11-27.1 33.7h17.8l18.3-22.7z"/><path fill="#000" d="M81 79.3 17 0H0v79.3h13.6V17l50.2 62.3H81Zm252.6-.4c-1 0-1.8-.4-2.5-1s-1.1-1.6-1.1-2.6.3-1.8 1-2.5 1.6-1 2.6-1 1.8.3 2.5 1a3.4 3.4 0 0 1 .6 4.3 3.7 3.7 0 0 1-3 1.8zm23.2-33.5h6v23.3c0 2.1-.4 4-1.3 5.5a9.1 9.1 0 0 1-3.8 3.5c-1.6.8-3.5 1.3-5.7 1.3-2 0-3.7-.4-5.3-1s-2.8-1.8-3.7-3.2c-.9-1.3-1.4-3-1.4-5h6c.1.8.3 1.6.7 2.2s1 1.2 1.6 1.5c.7.4 1.5.5 2.4.5 1 0 1.8-.2 2.4-.6a4 4 0 0 0 1.6-1.8c.3-.8.5-1.8.5-3V45.5zm30.9 9.1a4.4 4.4 0 0 0-2-3.3 7.5 7.5 0 0 0-4.3-1.1c-1.3 0-2.4.2-3.3.5-.9.4-1.6 1-2 1.6a3.5 3.5 0 0 0-.3 4c.3.5.7.9 1.3 1.2l1.8 1 2 .5 3.2.8c1.3.3 2.5.7 3.7 1.2a13 13 0 0 1 3.2 1.8 8.1 8.1 0 0 1 3 6.5c0 2-.5 3.7-1.5 5.1a10 10 0 0 1-4.4 3.5c-1.8.8-4.1 1.2-6.8 1.2-2.6 0-4.9-.4-6.8-1.2-2-.8-3.4-2-4.5-3.5a10 10 0 0 1-1.7-5.6h6a5 5 0 0 0 3.5 4.6c1 .4 2.2.6 3.4.6 1.3 0 2.5-.2 3.5-.6 1-.4 1.8-1 2.4-1.7a4 4 0 0 0 .8-2.4c0-.9-.2-1.6-.7-2.2a11 11 0 0 0-2.1-1.4l-3.2-1-3.8-1c-2.8-.7-5-1.7-6.6-3.2a7.2 7.2 0 0 1-2.4-5.7 8 8 0 0 1 1.7-5 10 10 0 0 1 4.3-3.5c2-.8 4-1.2 6.4-1.2 2.3 0 4.4.4 6.2 1.2 1.8.8 3.2 2 4.3 3.4 1 1.4 1.5 3 1.5 5h-5.8z"/></svg>
+</file>
+
+<file path="public/vercel.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+</file>
+
+<file path="public/window.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+</file>
+
+<file path="README.md">
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+</file>
+
+<file path="app/archive/page.tsx">
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { supabase } from "@/lib/supabaseClient";
+
+type Trivia = {
+  id: string;
+  trivia_id: string;
+  category: string;
+  title: string;
+  content: string;
+  unlocked_at: string;
+};
+
+const CATEGORIES = ["すべて", "サバイバル", "建築", "裏技", "Mob", "レッドストーン"];
+
+export default function ArchivePage() {
+  const [collection, setCollection] = useState<Trivia[]>([]);
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState("すべて");
+
+  useEffect(() => {
+    const fetchTrivia = async () => {
+      const { data } = await supabase.from('trivia_collection').select('*').order('unlocked_at', { ascending: false });
+      if (data) setCollection(data);
+    };
+    void fetchTrivia();
+  }, []);
+
+  const filteredCollection = collection.filter(t => {
+    const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) || t.content.toLowerCase().includes(search.toLowerCase());
+    const matchCategory = activeCategory === "すべて" || t.category === activeCategory;
+    return matchSearch && matchCategory;
+  });
+
+  return (
+    <div className="min-h-screen bg-[#1a1a1a] text-white font-mono p-3 pb-24 max-w-4xl mx-auto relative">
+      <Link href="/" className="fixed top-4 left-4 text-xs bg-black/80 px-4 py-2 border-2 border-stone-500 font-bold z-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:scale-95 text-white">🏠 拠点</Link>
+
+      <header className="mb-8 pt-16 text-center">
+        <h1 className="text-3xl font-black text-emerald-400 uppercase tracking-widest mb-2 border-b-4 border-emerald-700 pb-4 inline-block">📚 豆知識図鑑</h1>
+        <p className="text-stone-400 font-bold text-sm">解放したマイクラの知識：{collection.length} 個</p>
+      </header>
+
+      <div className="mb-8 bg-stone-900 border-4 border-black p-5 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+        <input 
+          type="text" 
+          placeholder="🔎 キーワードで検索..." 
+          value={search} 
+          onChange={(e) => setSearch(e.target.value)} 
+          className="w-full bg-black border-2 border-stone-700 p-4 text-white font-bold outline-none mb-4 focus:border-emerald-500 transition-colors"
+        />
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+          {CATEGORIES.map(c => (
+            <button 
+              key={c} 
+              onClick={() => setActiveCategory(c)} 
+              className={`min-w-fit px-4 py-2 border-2 border-black font-black text-xs shadow-md active:translate-y-1 ${activeCategory === c ? 'bg-emerald-600 text-white' : 'bg-stone-800 text-stone-400'}`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filteredCollection.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {filteredCollection.map((t) => (
+            <div key={t.id} className="bg-stone-800 border-4 border-black p-5 relative shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-transform">
+              <div className="absolute top-0 right-0 bg-emerald-700 text-white text-[10px] font-black px-3 py-1 border-b-2 border-l-2 border-black">
+                {t.category}
+              </div>
+              <h2 className="text-xl font-black text-yellow-400 mb-3 pr-16">{t.title}</h2>
+              <p className="text-white text-sm font-bold leading-relaxed bg-black/40 p-4 border-2 border-stone-700 shadow-inner">{t.content}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-20 bg-black/40 border-4 border-dashed border-stone-700">
+          <p className="text-stone-500 font-bold text-lg">まだこのジャンルの知識はないぞ！<br/>クエストをクリアしてガチャを引こう！</p>
+        </div>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="components/GameScreen.tsx">
+// components/GameScreen.tsx
+'use client'
+import React from 'react'
+
+type GameScreenProps = {
+  currentUser: any;
+  view: string;
+  mode: string;
+  questQueue: any[];
+  currentIndex: number;
+  isTransitioning: boolean;
+  selectedInputMode: string;
+  rickMode: string;
+  inputMode: string;
+  langMode: string;
+  gameStep: number;
+  setGameStep: (step: number) => void;
+  weekendPhase: number;
+  bossHp: number;
+  currentGameGoal: number;
+  isBossAttacked: boolean;
+  showRick: boolean;
+  message: string;
+  showHint: boolean;
+  showFlashAnswer: boolean;
+  mistakeCount: number;
+  feedbackMsg: React.ReactNode;
+  options: any[];
+  userAnswer: string;
+  setUserAnswer: (ans: string) => void;
+  isListening: boolean;
+  isDrawing: boolean;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+  startDrawing: (e: React.PointerEvent<HTMLCanvasElement>) => void;
+  draw: (e: React.PointerEvent<HTMLCanvasElement>) => void;
+  stopDrawing: () => void;
+  clearCanvas: () => void;
+  startListening: () => void;
+  checkAnswer: (ans: string, isVoice?: boolean) => void;
+  handleSelfJudge: (isCorrect: boolean) => void;
+  nextQuestion: () => void;
+  stopSpeaking: () => void;
+  setView: (view: string) => void;
+  renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
+  speakWord: (text: string) => void;
+  getFullReading: (reading: string, okurigana?: string | null) => string;
+}
+
+export default function GameScreen(props: GameScreenProps) {
+  const {
+    currentUser, view, mode, questQueue, currentIndex, isTransitioning,
+    selectedInputMode, rickMode, inputMode, langMode, gameStep, setGameStep,
+    weekendPhase, bossHp, currentGameGoal, isBossAttacked, showRick, message,
+    showHint, showFlashAnswer, mistakeCount, feedbackMsg, options,
+    userAnswer, setUserAnswer, isListening, canvasRef,
+    startDrawing, draw, stopDrawing, clearCanvas, startListening,
+    checkAnswer, handleSelfJudge, nextQuestion, stopSpeaking, setView,
+    renderReading, speakWord, getFullReading
+  } = props;
+
+  const [word] = questQueue.slice(currentIndex, currentIndex + 1);
+
+  if (!word) return null; 
+
+  if (isTransitioning) {
+    return (
+      <div className={`min-h-screen ${currentUser.light} flex flex-col items-center justify-center pt-8 px-4`}>
+        <div className="animate-spin text-5xl mb-4">🌀</div>
+        <p className="text-stone-500 font-bold tracking-widest">次のステージへ...</p>
+      </div>
+    );
+  }
+  
+  const currentInputMode = view === 'rick_challenge' ? (
+      rickMode === 'write' ? 'canvas' : 'self'
+  ) : (
+      (mode === 'weekend') ? inputMode : (
+          selectedInputMode === 'write_canvas' ? 'canvas' : 
+          selectedInputMode === 'write_self' ? 'self' : 
+          selectedInputMode === 'typing_read' ? 'typing' : 'quiz'
+      )
+  );
+
+  // ★ 読み上げボタンの共通コンポーネント
+  const VoiceButton = ({ text }: { text: string }) => (
+    <button 
+      onClick={() => speakWord(text)}
+      className="bg-white text-sky-500 p-2 rounded-full shadow-md border border-sky-100 active:scale-90 transition-transform ml-2 shrink-0"
+    >
+      <span className="text-xl">🔊</span>
+    </button>
+  );
+
+  return (
+    <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-4 px-4 font-sans pb-10`}>
+      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl overflow-hidden min-h-[600px] flex flex-col relative border border-white/50">
+         
+         {/* モードラベル */}
+         {mode === 'parent_challenge' && <div className="w-full bg-rose-500 text-white text-center py-1.5 text-xs font-black tracking-widest">🔥 パパからの挑戦状 🔥</div>}
+         {mode === 'weekend' && (
+           <div className="w-full bg-slate-900 text-white p-5 flex flex-col items-center relative overflow-hidden">
+             <p className="text-xs font-bold text-indigo-300 mb-2 tracking-widest">WEEKEND BOSS BATTLE</p>
+             <div className={`text-7xl mb-3 transition-transform duration-100 ${isBossAttacked ? 'scale-90 opacity-50' : 'animate-bounce'}`}>🐉</div>
+             <div className="w-full max-w-xs bg-slate-700 rounded-full h-4 border-2 border-slate-500 overflow-hidden">
+               <div className="bg-gradient-to-r from-rose-500 to-orange-500 h-full transition-all duration-300" style={{ width: `${(bossHp / currentGameGoal) * 100}%` }}></div>
+             </div>
+           </div>
+         )}
+         
+        {/* クエストヘッダー */}
+        <div className={`${currentUser.color} p-4 flex justify-between items-center text-white shadow-sm`}>
+          <div className="flex flex-col">
+            <span className="font-black tracking-widest text-[10px] uppercase opacity-70">QUEST {currentIndex + 1} / {questQueue.length}</span>
+            <span className="text-xs font-bold">リクが応援してるワン！🦴</span>
+          </div>
+          <button onClick={() => { stopSpeaking(); setView('menu'); }} className="text-[10px] font-black bg-black/20 px-4 py-2 rounded-full active:bg-black/40 transition">むらへもどる</button>
+        </div>
+
+        <div className="flex-1 p-6 flex flex-col items-center justify-center relative w-full">
+          
+          {/* Rickの解説モーダル */}
+          {showRick && (
+            <div className="absolute inset-0 bg-stone-900/60 z-30 flex flex-col items-center justify-center p-4 animate-in fade-in backdrop-blur-md">
+              <div className="bg-white rounded-[2.5rem] p-8 flex flex-col items-center text-center shadow-2xl max-w-xs w-full animate-in zoom-in duration-300">
+                <img src="/Rick.png" alt="Rick" className="w-24 h-24 rounded-full border-4 border-orange-400 mb-4 shadow-xl object-cover" />
+                <p className="text-2xl font-black text-orange-600 mb-4">{message}</p>
+                
+                <div className="mb-6 w-full bg-stone-50 rounded-3xl p-5 border-2 border-stone-100">
+                  <p className="text-5xl font-black text-stone-800 mb-2">{word.kanji}</p>
+                  <div className="flex items-center justify-center">
+                    <p className="text-xl font-bold text-sky-600">{renderReading(word.reading, word.okurigana)}</p>
+                    <VoiceButton text={getFullReading(word.reading, word.okurigana)} />
+                  </div>
+                </div>
+
+                {message.includes('正解') && word.origin_logic && (
+                  <div className="w-full bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 mb-6 text-left shadow-inner">
+                    <p className="text-xs font-black text-amber-700 mb-2">💡 リクの豆知識</p>
+                    <p className="text-[13px] text-stone-700 font-bold leading-relaxed">{word.origin_logic}</p>
+                  </div>
+                )}
+                <button onClick={nextQuestion} className={`${currentUser.color} text-white font-black py-5 w-full rounded-2xl shadow-xl active:scale-95 transition tracking-widest text-lg`}>次へ！ 🐾</button>
+              </div>
+            </div>
+          )}
+          
+          {/* 自己判定・手書きモードのメインUI */}
+          {(currentInputMode === 'canvas' || currentInputMode === 'self') && (
+              <div className="flex-1 w-full flex flex-col items-center">
+                  <div className="text-center mb-6 w-full flex items-center justify-center">
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center">
+                          <p className="text-4xl font-black text-sky-600 bg-sky-50 px-6 py-3 rounded-3xl border-2 border-sky-100 shadow-inner">
+                            {renderReading(word.reading, word.okurigana)}
+                          </p>
+                          <VoiceButton text={getFullReading(word.reading, word.okurigana)} />
+                        </div>
+                        {word.sentence && <p className="text-base font-bold text-stone-600 mt-4 px-4">{word.sentence.replace('□', '〇')}</p>}
+                      </div>
+                  </div>
+
+                  {/* メインエリア（キャンバスまたは隠し漢字） */}
+                  <div className="relative w-full flex-1 min-h-[250px] mb-6">
+                    {currentInputMode === 'canvas' ? (
+                        <div className={`h-full w-full bg-white border-4 rounded-[2rem] shadow-inner relative transition-colors ${gameStep === 0 ? 'border-emerald-200' : 'border-stone-200'}`}>
+                            {gameStep === 0 && <span className="absolute top-4 left-4 text-stone-300 font-black text-sm pointer-events-none tracking-widest animate-pulse">ここに書いてね！</span>}
+                            <canvas 
+                              ref={canvasRef} 
+                              width={400} 
+                              height={300} 
+                              className="w-full h-full touch-none cursor-crosshair" 
+                              onPointerDown={startDrawing} 
+                              onPointerMove={draw} 
+                              onPointerUp={stopDrawing} 
+                              onPointerLeave={stopDrawing}
+                              style={{ touchAction: 'none' }} 
+                            />
+                            {gameStep === 0 && <button onClick={clearCanvas} className="absolute bottom-4 right-4 bg-stone-100 text-stone-500 px-4 py-2 rounded-full text-xs font-black shadow-sm active:scale-90 transition">🗑️ 書きなおす</button>}
+                        </div>
+                    ) : (
+                        <div className="h-full w-full bg-stone-50 border-4 border-dashed border-stone-200 rounded-[2.5rem] flex items-center justify-center">
+                            {gameStep === 0 ? (
+                              <div className="text-center">
+                                <span className="text-8xl text-stone-200 block mb-4">✍️</span>
+                                <span className="text-sm text-stone-400 font-black tracking-widest uppercase">頭の中で書いてみよう</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center animate-in zoom-in">
+                                <span className="text-[9rem] font-black text-stone-800 leading-none drop-shadow-md">{word.kanji}</span>
+                                <VoiceButton text={word.kanji} />
+                              </div>
+                            )}
+                        </div>
+                    )}
+                  </div>
+
+                  {/* ★ 自己判定ボタン */}
+                  {gameStep === 0 ? (
+                      <button 
+                        onClick={() => { 
+                            setGameStep(1); 
+                            speakWord(word.kanji); // 正解表示時に読み上げ
+                        }} 
+                        className="w-full bg-stone-800 text-white font-black py-6 rounded-[2rem] shadow-xl active:scale-95 transition text-2xl tracking-widest mt-auto border-b-8 border-stone-950"
+                      >
+                        答え合わせ！ 👀
+                      </button>
+                  ) : (
+                      <div className="w-full flex flex-col gap-4 animate-in slide-in-from-bottom-4 mt-auto">
+                          <div className="flex gap-4 w-full">
+                              <button 
+                                onClick={() => handleSelfJudge(false)} 
+                                className="flex-1 bg-white text-rose-500 font-black py-8 rounded-[2rem] border-2 border-rose-100 shadow-md active:translate-y-1 transition text-xl flex flex-col items-center"
+                              >
+                                <span className="text-3xl mb-1">❌</span>
+                                <span>だめだった</span>
+                              </button>
+                              <button 
+                                onClick={() => handleSelfJudge(true)} 
+                                className="flex-1 bg-gradient-to-br from-emerald-400 to-emerald-600 text-white font-black py-8 rounded-[2rem] shadow-xl active:translate-y-1 transition text-xl flex flex-col items-center"
+                              >
+                                <span className="text-3xl mb-1">⭕</span>
+                                <span>書けた！</span>
+                              </button>
+                          </div>
+                      </div>
+                  )}
+              </div>
+          )}
+
+          {/* クイズ・タイピングモードのUI */}
+          {(currentInputMode === 'quiz' || currentInputMode === 'typing') && (
+              <div className="w-full flex flex-col items-center flex-1">
+                
+                {/* 出題エリア */}
+                <div className="w-full mb-8">
+                    {currentInputMode === 'quiz' ? (
+                        <div className="flex flex-col items-center">
+                            {langMode === 'kanji_to_read' ? (
+                                <div className="bg-stone-50 border-2 border-stone-200 rounded-[2.5rem] p-10 shadow-inner w-full text-center">
+                                  <h2 className="text-[6rem] font-black text-stone-800 leading-none mb-4">{word.kanji}</h2>
+                                  <VoiceButton text={word.kanji} />
+                                </div>
+                            ) : (
+                                <div className="bg-sky-50 border-2 border-sky-200 rounded-[2.5rem] p-8 shadow-inner w-full text-center">
+                                  <div className="flex items-center justify-center mb-4">
+                                    <h2 className="text-5xl font-black text-sky-800 leading-tight">{renderReading(word.reading, word.okurigana)}</h2>
+                                    <VoiceButton text={getFullReading(word.reading, word.okurigana)} />
+                                  </div>
+                                  {word.sentence && <p className="text-stone-600 font-bold text-lg bg-white/80 py-3 px-6 rounded-2xl shadow-sm">「{word.sentence.replace('□', '〇')}」</p>}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="bg-stone-50 border-2 border-stone-200 rounded-[2.5rem] p-10 shadow-inner w-full text-center">
+                            <h2 className="text-7xl font-black text-stone-800 mb-4">{word.kanji}</h2>
+                            <VoiceButton text={word.kanji} />
+                        </div>
+                    )}
+                </div>
+
+                {/* 回答エリア */}
+                {currentInputMode === 'quiz' ? (
+                  <div className="grid grid-cols-1 gap-4 w-full mt-auto">
+                      {options.map((opt) => (
+                          <button 
+                            key={opt.id} 
+                            onClick={() => checkAnswer(langMode === 'kanji_to_read' ? getFullReading(opt.reading, opt.okurigana) : opt.kanji)} 
+                            className="bg-white border-b-4 border-stone-200 text-stone-700 font-black py-5 px-4 rounded-2xl transition-all text-2xl shadow-sm active:translate-y-1 active:border-b-0 hover:bg-stone-50"
+                          >
+                              {langMode === 'kanji_to_read' ? renderReading(opt.reading, opt.okurigana) : opt.kanji}
+                          </button>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="w-full mt-auto">
+                      <div className="relative mb-6">
+                          <input 
+                            type="text" 
+                            value={userAnswer} 
+                            onChange={(e) => setUserAnswer(e.target.value)} 
+                            onKeyDown={(e) => e.key === 'Enter' && checkAnswer(userAnswer)} 
+                            className="w-full border-4 border-sky-200 rounded-3xl py-6 px-6 text-center text-4xl font-black focus:outline-none focus:border-sky-500 text-stone-800 shadow-inner bg-stone-50" 
+                            placeholder="よみかた..." 
+                            autoFocus 
+                          />
+                          <button onClick={startListening} className={`absolute right-4 top-1/2 -translate-y-1/2 text-4xl active:scale-90 transition-transform ${isListening ? 'animate-pulse text-rose-500' : 'text-stone-300'}`}>
+                              {isListening ? '🎙️' : '🎤'}
+                          </button>
+                      </div>
+                      <button onClick={() => checkAnswer(userAnswer)} className="w-full bg-gradient-to-r from-sky-500 to-indigo-600 text-white font-black py-5 rounded-[2rem] shadow-xl active:scale-95 text-2xl tracking-widest border-b-8 border-indigo-800">決定！ 🐾</button>
+                  </div>
+                )}
+
+                {/* フィードバックメッセージ */}
+                {feedbackMsg && (
+                    <div className="mt-6 bg-rose-50 border-2 border-rose-200 text-stone-700 py-3 px-6 rounded-2xl text-sm animate-in zoom-in shadow-sm font-bold">
+                        {feedbackMsg}
+                    </div>
+                )}
+
+              </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="lib/constants.ts">
+// --- 型定義 ---
+
+export type KanjiWord = {
+  id: number;
+  kanji: string;
+  reading: string;
+  okurigana?: string | null;
+  emoji: string;
+  category: string;
+  sentence?: string;
+  usage_example?: string;
+  origin_logic?: string;
+  stroke_count?: number;
+  stroke_data_url?: string;
+  currentStatus?: string;
+};
+
+export type ActivityLog = {
+  time: string;
+  word: string;
+  mode: string;
+  result: 'correct' | 'incorrect' | 'done';
+};
+
+export type DailyLog = {
+  id: number;
+  user_id: string;
+  date: string;
+  count: number;
+  is_completed: boolean;
+  details: ActivityLog[];
+  streak: number;
+  study_time_seconds: number;
+  collection_views: number;
+  parent_reply?: string;
+};
+
+export type ChallengeSettings = {
+  target_user_id: string;
+  mode: 'manual' | 'auto';
+  selected_ids: number[];
+  auto_count: number;
+  quest_count: number;
+  special_quest_count: number;
+  challenge_quest_count: number;
+  reward_goal_days: number;
+  reward_text: string;
+  owned_rewards: number;
+  total_earned_rewards: number;
+  unlocked_tips: string[];
+};
+
+// ★ ビルドエラーを解消するための重要な定義
+export type ProgressStats = {
+  total: number;
+  mastered: number;
+  ranks: {
+    learning: number;
+    bronze: number;
+    silver: number;
+    gold: number;
+  };
+  weakWords: {
+    word: string;
+    meaning: string;
+    mistakes: number;
+  }[];
+  checkWords: any[];
+  recentLogs: any[];
+  graphData: {
+    date: string;
+    count: number;
+  }[];
+  pieData: {
+    name: string;
+    value: number;
+  }[];
+};
+
+// --- 定数データ ---
+
+export const USERS = [
+  { id: 'brother', db_target: 'brother', name: 'たくま (小6)', color: 'bg-amber-600', light: 'bg-amber-50', border: 'border-amber-600', text: 'text-amber-700', hue: 'from-amber-500 to-orange-600', defaultTipTable: 'minecraft_tips' },
+  { id: 'sister', db_target: 'sister', name: 'みのり (小4)', color: 'bg-sky-500', light: 'bg-sky-50', border: 'border-sky-500', text: 'text-sky-700', hue: 'from-sky-400 to-indigo-500', defaultTipTable: 'school_tips' },
+  { id: 'mami', db_target: 'parent', name: 'まみ', color: 'bg-pink-500', light: 'bg-pink-50', border: 'border-pink-500', text: 'text-pink-700', hue: 'from-pink-400 to-rose-500', defaultTipTable: 'school_tips' },
+  { id: 'kenta', db_target: 'parent', name: 'けんた', color: 'bg-emerald-500', light: 'bg-emerald-50', border: 'border-emerald-500', text: 'text-emerald-700', hue: 'from-emerald-400 to-teal-500', defaultTipTable: 'minecraft_tips' }
+];
+
+export const CATEGORIES = [
+  { id: 'kyu10', name: '10級 (小1)' },
+  { id: 'kyu9', name: '9級 (小2)' },
+  { id: 'kyu8', name: '8級 (小3)' },
+  { id: 'kyu7', name: '7級 (小4)' },
+  { id: 'kyu6', name: '6級 (小5)' },
+  { id: 'kyu5', name: '5級 (小6)' },
+  { id: 'general', name: '一般・中学以上' }
+];
+
+export const MODE_NAMES: Record<string, string> = {
+  daily: '毎日の冒険',
+  free: 'フリー練習',
+  weekend: '週末ボス',
+  parent_challenge: 'パパからの挑戦',
+  rick_challenge: 'Rickの特訓',
+  revenge: 'リベンジ'
+};
+
+// --- ヘルパー関数 ---
+
+// 安全にユーザー名を取得する関数（分割代入ルール適用済み）
+export const getUserFirstName = (name: string) => {
+  const parts = name.split(' ');
+  const [first] = parts; 
+  return first || name;
+};
+
+const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+
+// たくま君のスケジュールに合わせた応援メッセージ
+export const getDailyMessage = (userId: string) => {
+    if (userId !== 'brother') return "今日も自分のペースで頑張ろう！🚀";
+    const day = getJSTDate().getDay();
+    
+    if (day === 2) return "🔥 火曜日は学習の拠点！ガッツリ進めよう！";
+    if (day >= 3 && day <= 5) return "⚡ 塾前1時間の短期集中！ピンポイント特訓だ！";
+    if (day === 0 || day === 6) return "⚽ 週末はサッカー全集中！移動時間を活用しよう！";
+    return "🚀 今週もコツコツ積み上げよう！";
+};
+</file>
+
+<file path="lib/trivia.ts">
+export const MINECRAFT_TRIVIA = [
+  { id: "mc_001", category: "サバイバル", title: "無限水源の作り方", content: "2x2の穴を掘り、斜めに向かい合う2つの角に水を流すと、何度汲んでも水がなくならない「無限水源」ができるぞ！" },
+  { id: "mc_002", category: "裏技", title: "クリーパーの爆発回避", content: "クリーパーが爆発する瞬間、自分とクリーパーの間にブロックを1つ置くだけで、受けるダメージを劇的に減らすことができる！" },
+  { id: "mc_003", category: "Mob", title: "クリーパーの弱点", content: "クリーパーは「ネコ（ヤマネコ）」がとっても苦手！ネコを連れて歩くか、家の周りに座らせておけばクリーパーは近寄ってこないぞ。" },
+  { id: "mc_004", category: "建築", title: "湧き潰しの基本", content: "下付きハーフブロック、ガラス、葉っぱブロックの上には敵モブがスポーン（湧く）しない。明るさを気にせず安全な屋根を作れるぞ！" },
+  { id: "mc_005", category: "サバイバル", title: "最強の食料", content: "回復力と「隠し満腹度」のバランスで考えると『金のニンジン』が最強！ダッシュできる時間が圧倒的に長くなるぞ。" },
+  { id: "mc_006", category: "レッドストーン", title: "水流を止める魔法", content: "看板やフェンスゲート、トラップドアは「水を通さない」性質がある。これを使えば、水中で息継ぎできる空間を作れる！" },
+  { id: "mc_007", category: "裏技", title: "氷ボートで超高速移動", content: "氷（または青氷）を敷き詰めた道の上をボートで走ると、歩くよりもトロッコよりも圧倒的な超スピードで移動できるぞ！" },
+  { id: "mc_008", category: "サバイバル", title: "ネザーでのベッド", content: "ネザーやジ・エンドでベッドを使って寝ようとすると…大爆発を起こす！これを利用して古代の残骸（ネザライト）を探すテクニックもあるぞ。" },
+  { id: "mc_009", category: "Mob", title: "名札の秘密「Dinnerbone」", content: "名札を使ってモブに「Dinnerbone」または「Grumm」という名前をつけると、モブが逆さま（天地逆）になってしまう面白い裏技がある！" },
+  { id: "mc_010", category: "建築", title: "無限のマグマ燃料", content: "鍾乳石（ドリップストーン）の上にマグマを置き、下に大釜を置いておくと、時間が経てば無限にマグマを集められる！かまどの燃料に最適だ。" }
+];
+</file>
+
+<file path="app/layout.tsx">
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: '毎日漢検クエスト',
+  description: 'Rickと一緒に毎日漢字の特訓をしよう！',
+  icons: {
+    icon: '/Rick.png',
+    apple: '/Rick.png',
+  },
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="ja">
+      <body className={inter.className}>{children}</body>
+    </html>
+  )
+}
+</file>
+
+<file path="components/AdminScreen.tsx">
+'use client'
+import React, { useState } from 'react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Label } from 'recharts'
+import { USERS, CATEGORIES, getUserFirstName } from '@/lib/constants'
+
+const getPieColor = (index: number) => {
+  const colors = ['#E5E7EB', '#CD7F32', '#C0C0C0', '#FFD700'];
+  const [c0, c1, c2, c3] = colors;
+  const mod = index % 4;
+  if (mod === 0) return c0;
+  if (mod === 1) return c1;
+  if (mod === 2) return c2;
+  return c3;
+};
+
+const BAR_RADIUS = [4, 4, 0, 0];
+
+type AdminScreenProps = {
+  currentUser: any;
+  setView: (view: string) => void;
+  adminTargetUser: any;
+  setAdminTargetUser: (user: any) => void;
+  fetchAdminStats: (user: any) => void;
+  fetchAllWordsForEdit: () => void;
+  stats: any;
+  challengeSettings: any;
+  setChallengeSettings: (settings: any) => void;
+  saveChallengeSettings: (settings: any) => void;
+  sendLineToChild: (msg: string) => void;
+  editStreak: number;
+  setEditStreak: (num: number) => void;
+  handleSaveStreak: () => void;
+  handleAddWord: (newWordData: any) => void;
+  allWordsList: any[];
+  toggleMasterStatus: (id: number, currentStatus: string) => void;
+  handleDeleteWord: (id: number) => void;
+  monthlyLogs: any[];
+  selectedLogDate: string | null;
+  setSelectedLogDate: (date: string | null) => void;
+  renderCalendar: () => React.ReactNode;
+}
+
+export default function AdminScreen(props: AdminScreenProps) {
+  const {
+    setView, adminTargetUser, setAdminTargetUser, fetchAdminStats,
+    fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings,
+    saveChallengeSettings, sendLineToChild, editStreak, setEditStreak,
+    handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus,
+    handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar
+  } = props;
+
+  const [adminTab, setAdminTab] = useState<'stats' | 'challenge' | 'add_word' | 'manage'>('stats');
+  const [showAllWeakWords, setShowAllWeakWords] = useState(false);
+  const [newWord, setNewWord] = useState({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: 'kyu10', stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' });
+
+  const matchingLogs = selectedLogDate ? monthlyLogs.filter(l => l.date === selectedLogDate) : [];
+  const [selectedLog] = matchingLogs;
+  const [rTopL, rTopR, rBotR, rBotL] = BAR_RADIUS;
+
+  const onAddWordClick = () => {
+    handleAddWord(newWord);
+    setNewWord({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: 'kyu10', stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' });
+  };
+
+  const handleConsumeReward = async () => {
+    const { owned_rewards: owned = 0, reward_text: rText = 'ご褒美' } = challengeSettings;
+    if (owned <= 0) {
+      alert("使えるストックがありません！");
+      return;
+    }
+    if (!confirm(`「${rText}」を1つ使いますか？\n（ストックが1つ減ります）`)) return;
+
+    const newOwned = owned - 1;
+    const { supabase } = await import('@/lib/supabaseClient');
+    const { error } = await supabase.from('challenge_settings').update({ owned_rewards: newOwned }).eq('target_user_id', adminTargetUser.id);
+    
+    if (error) {
+      alert("エラーが発生しました: " + error.message);
+    } else {
+      setChallengeSettings({ ...challengeSettings, owned_rewards: newOwned });
+      alert("ご褒美ストックを1つ消費しました！🎁");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-stone-100 p-4 font-sans text-stone-800 pb-20">
+      {/* ログ詳細モーダル */}
+      {selectedLogDate && (
+        <div className="fixed inset-0 bg-stone-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedLogDate(null)}>
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl relative" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-black text-stone-800 mb-4 text-center">{selectedLogDate} の記録</h3>
+            <div className="overflow-y-auto flex-1 pr-2 mb-5 no-scrollbar">
+              {selectedLog?.details?.length ? (
+                selectedLog.details.map((d: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between py-3 border-b border-stone-100">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] bg-stone-100 px-2 py-1 rounded-lg font-bold">{d.mode}</span>
+                      <span className="font-black text-sm">{d.word}</span>
+                    </div>
+                    <span>{d.result === 'correct' ? '⭕' : d.result === 'done' ? '✓' : '❌'}</span>
+                  </div>
+                ))
+              ) : <p className="text-center text-stone-400 py-6">データなし</p>}
+            </div>
+            <button onClick={() => setSelectedLogDate(null)} className="w-full bg-stone-800 text-white font-black py-4 rounded-xl shadow-lg">閉じる</button>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-2xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <button onClick={() => setView('menu')} className="text-stone-500 font-bold bg-white px-6 py-2 rounded-full shadow-sm hover:bg-stone-50 transition">← もどる</button>
+          <h2 className="text-2xl font-black text-stone-700">保護者メニュー</h2>
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
+          {USERS.map((u: any) => (
+            <button key={u.id} onClick={() => { setAdminTargetUser(u); fetchAdminStats(u); }} className={`px-5 py-2.5 rounded-full text-sm font-black transition-all shadow-sm ${adminTargetUser.id === u.id ? `bg-gradient-to-r ${u.hue} text-white scale-105 shadow-md` : 'bg-white text-stone-400 hover:bg-stone-50'}`}>
+              {u.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-2xl p-2 mb-8 shadow-md flex border-2 border-stone-200">
+          <button onClick={() => setAdminTab('stats')} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${adminTab === 'stats' ? 'bg-orange-100 text-orange-700 shadow-inner' : 'text-stone-400'}`}>📊 成績</button>
+          <button onClick={() => { setAdminTab('challenge'); fetchAllWordsForEdit(); }} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${adminTab === 'challenge' ? 'bg-rose-100 text-rose-700 shadow-inner' : 'text-stone-400'}`}>⚔️ 挑戦状</button>
+          <button onClick={() => setAdminTab('add_word')} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${adminTab === 'add_word' ? 'bg-indigo-100 text-indigo-700 shadow-inner' : 'text-stone-400'}`}>➕ 追加</button>
+          <button onClick={() => { setAdminTab('manage'); fetchAllWordsForEdit(); }} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${adminTab === 'manage' ? 'bg-slate-100 text-slate-700 shadow-inner' : 'text-stone-400'}`}>📝 編集</button>
+        </div>
+
+        <div className="space-y-6">
+          {adminTab === 'stats' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-orange-50 p-6 rounded-[2rem] border-2 border-orange-100 shadow-sm md:col-span-2 text-left">
+                  <h3 className="font-black text-orange-700 mb-2 flex items-center gap-2">🕒 今日の学習状況</h3>
+                  <div className="flex items-end justify-between">
+                    <div>
+                      {(() => {
+                        const todayStr = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+                        const matching = (stats?.recentLogs || []).filter((l: any) => l.date === todayStr);
+                        const [todayLog] = matching;
+                        const studySeconds = todayLog?.study_time_seconds || 0;
+                        const remainingSeconds = Math.max(0, 600 - studySeconds);
+                        const remainingMinutes = Math.ceil(remainingSeconds / 60);
+
+                        return (
+                          <>
+                            <p className="text-3xl font-black text-orange-600">
+                              {Math.floor(studySeconds / 60)} <span className="text-sm">分</span> {studySeconds % 60} <span className="text-sm">秒</span>
+                            </p>
+                            <p className="text-xs font-bold text-stone-500 mt-1">
+                              {remainingSeconds > 0 
+                                ? `ご褒美まで、あと約 ${remainingMinutes}分 の学習が必要です。` 
+                                : "✅ ご褒美ライン（10分）を突破しています！"}
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-stone-400">今日の正解数</p>
+                      {(() => {
+                        const [latestLog] = stats?.recentLogs || [];
+                        const tParts = new Date().toISOString().split('T');
+                        const [todayIso] = tParts;
+                        const isToday = latestLog?.date === todayIso;
+                        return <p className="text-xl font-black text-stone-700">{isToday ? latestLog.count : 0} 問</p>;
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 flex flex-col">
+                  <h3 className="font-black text-stone-700 mb-2 flex items-center gap-2">📈 習得率</h3>
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="w-1/2 h-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={stats?.pieData || []} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" stroke="none">
+                            {(stats?.pieData || []).map((e: any, i: number) => <Cell key={i} fill={getPieColor(i)} />)}
+                            <Label value={`${Math.round(((stats?.mastered || 0) / (stats?.total || 1)) * 100) || 0}%`} position="center" className="font-black text-xl text-stone-700" />
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="w-1/2 flex flex-col gap-2 text-xs font-bold text-stone-500 ml-2">
+                      {(stats?.pieData || []).map((entry: any, index: number) => (
+                        <div key={index} className="flex items-center gap-2 text-left">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPieColor(index) }}></div>
+                          <span className="truncate">{entry.name} ({entry.value})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 flex flex-col">
+                  <h3 className="font-black text-stone-700 mb-4 flex items-center gap-2">🔥 苦手ワースト</h3>
+                  <ul className="space-y-3 overflow-y-auto flex-1 pr-2 no-scrollbar max-h-40">
+                    {(stats?.weakWords || []).slice(0, showAllWeakWords ? undefined : 5).map((w: any, i: number) => (
+                      <li key={i} className="flex justify-between items-center text-sm border-b border-stone-100 pb-2 text-left">
+                        <div className="font-bold text-stone-800 truncate mr-2 flex-1">
+                          {i+1}. {w.word} <span className="text-[10px] text-stone-400 font-normal">({w.meaning})</span>
+                        </div>
+                        <span className="bg-rose-50 text-rose-500 px-2 py-1 rounded-lg text-xs font-black shrink-0">{w.mistakes}回</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {(stats?.weakWords?.length || 0) > 5 && (
+                     <button onClick={() => setShowAllWeakWords(!showAllWeakWords)} className="mt-3 text-xs font-bold text-sky-500 bg-sky-50 hover:bg-sky-100 active:scale-95 transition-all py-2 rounded-xl w-full">
+                       {showAllWeakWords ? '▲ 閉じる' : 'もっと見る ▼'}
+                     </button>
+                  )}
+                </div>
+              </div> 
+
+              <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 text-left">
+                 <h3 className="font-black text-stone-700 mb-4 flex items-center gap-2">📊 30日間の学習推移 ({getUserFirstName(adminTargetUser.name)})</h3>
+                 <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats?.graphData || []}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis dataKey="date" tick={{fontSize: 10, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                        <YAxis tick={{fontSize: 10, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                        <Tooltip contentStyle={{borderRadius: '15px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
+                        <Bar dataKey="count" fill={adminTargetUser.id === 'sister' ? '#0ea5e9' : adminTargetUser.id === 'mami' ? '#ec4899' : adminTargetUser.id === 'kenta' ? '#10b981' : '#f59e0b'} radius={[rTopL, rTopR, rBotR, rBotL]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                 </div>
+              </div>
+
+              {renderCalendar()}
+            </div>
+          )}
+
+          {adminTab === 'challenge' && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 text-left">
+              <div className="bg-yellow-50/50 p-6 rounded-[2rem] border-2 border-yellow-100 shadow-sm space-y-4">
+                <h3 className="font-black text-yellow-600 flex items-center gap-2">👑 ご褒美ストック管理</h3>
+                <div className="flex items-center justify-between bg-white p-4 rounded-2xl border-2 border-yellow-100">
+                  <div>
+                    <p className="text-[10px] font-bold text-yellow-600 mb-1">現在の「{challengeSettings.reward_text || 'ご褒美'}」ストック</p>
+                    <p className="text-3xl font-black text-yellow-500">{challengeSettings.owned_rewards || 0} <span className="text-sm text-yellow-600">個</span></p>
+                    <p className="text-[10px] font-bold text-stone-400 mt-1">累計獲得: {challengeSettings.total_earned_rewards || 0} 個</p>
+                  </div>
+                  <button onClick={handleConsumeReward} className="bg-yellow-500 hover:bg-yellow-600 text-white font-black px-6 py-4 rounded-2xl shadow-md active:scale-95 transition-all">1個使う！</button>
+                </div>
+              </div>
+
+              <div className="bg-rose-50/50 p-6 rounded-[2rem] border-2 border-rose-100 shadow-sm space-y-4">
+                <h3 className="font-black text-rose-600 flex items-center gap-2">🎁 ご褒美の目標設定</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-black text-rose-400 block mb-1 ml-2">目標日数 (日)</label>
+                    <input type="number" className="w-full p-4 rounded-2xl border-2 border-rose-100 outline-none focus:border-rose-300 font-bold bg-white" value={challengeSettings.reward_goal_days} onChange={e => setChallengeSettings({...challengeSettings, reward_goal_days: parseInt(e.target.value) || 0})} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-rose-400 block mb-1 ml-2">達成時のご褒美</label>
+                    <input type="text" className="w-full p-4 rounded-2xl border-2 border-rose-100 outline-none focus:border-rose-300 font-bold bg-white" value={challengeSettings.reward_text} onChange={e => setChallengeSettings({...challengeSettings, reward_text: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-emerald-50/50 p-6 rounded-[2rem] border-2 border-emerald-100 shadow-sm">
+                <h3 className="font-black text-emerald-700 flex items-center gap-2 mb-4">🎯 出題数の設定</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs font-black text-emerald-500 block mb-1 ml-2">毎日の冒険</label>
+                    <input type="number" className="w-full p-4 rounded-2xl border-2 border-emerald-100 outline-none focus:border-emerald-300 font-bold bg-white" value={challengeSettings.quest_count} onChange={e => setChallengeSettings({...challengeSettings, quest_count: parseInt(e.target.value) || 0})} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-emerald-500 block mb-1 ml-2">週末ボス</label>
+                    <input type="number" className="w-full p-4 rounded-2xl border-2 border-emerald-100 outline-none focus:border-emerald-300 font-bold bg-white" value={challengeSettings.special_quest_count} onChange={e => setChallengeSettings({...challengeSettings, special_quest_count: parseInt(e.target.value) || 0})} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-emerald-500 block mb-1 ml-2">パパ / Rick挑戦</label>
+                    <input type="number" className="w-full p-4 rounded-2xl border-2 border-emerald-100 outline-none focus:border-emerald-300 font-bold bg-white" value={challengeSettings.challenge_quest_count} onChange={e => setChallengeSettings({...challengeSettings, challenge_quest_count: parseInt(e.target.value) || 0})} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-amber-50/50 p-6 rounded-[2rem] border-2 border-amber-100 shadow-sm">
+                <h3 className="font-black text-amber-700 mb-4">パパからの挑戦状設定</h3>
+                <div className="flex gap-6 mb-6 ml-2">
+                  <label className="flex items-center gap-2 font-bold text-sm cursor-pointer group">
+                    <input type="radio" checked={challengeSettings.mode === 'manual'} onChange={() => setChallengeSettings({...challengeSettings, mode: 'manual'})} className="w-5 h-5 accent-amber-600" /> <span>手動で選ぶ</span>
+                  </label>
+                  <label className="flex items-center gap-2 font-bold text-sm cursor-pointer group">
+                    <input type="radio" checked={challengeSettings.mode === 'auto'} onChange={() => setChallengeSettings({...challengeSettings, mode: 'auto'})} className="w-5 h-5 accent-amber-600" /> <span>苦手から自動</span>
+                  </label>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border-2 border-amber-100 mb-6">
+                  <p className="text-[10px] font-black text-amber-400 mb-1 ml-1">自動選択の問題数</p>
+                  <select className="w-full p-2 bg-transparent outline-none font-bold text-stone-700" value={challengeSettings.auto_count} onChange={e => setChallengeSettings({...challengeSettings, auto_count: parseInt(e.target.value) || 0})}>
+                    <option value="3">ワースト 3問</option>
+                    <option value="5">ワースト 5問</option>
+                    <option value="10">ワースト 10問</option>
+                    <option value="15">ワースト 15問</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => saveChallengeSettings(challengeSettings)} className="flex-1 bg-rose-500 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition-all tracking-widest text-lg">すべての設定を保存</button>
+                  <button onClick={() => sendLineToChild(`【${adminTargetUser.name}】パパから新しい挑戦状が届いたよ！🔥`)} className="bg-emerald-500 text-white font-black px-6 py-5 rounded-2xl shadow-xl active:scale-95 transition-all text-xs flex flex-col items-center justify-center gap-1"><span>LINE通知</span></button>
+                </div>
+              </div>
+
+              {/* 🚑 救済措置エリア（幅を合わせるためここに移動） */}
+              <div className="bg-[#1a1a1a] p-6 rounded-[2rem] shadow-2xl space-y-5 border border-white/5 text-left mt-8">
+                <div className="space-y-1">
+                  <h3 className="text-md font-black text-white flex items-center gap-2">🚑 救済措置（データの直接修正）</h3>
+                  <p className="text-[9px] text-stone-500 font-bold ml-1">記録を直したい時に使ってください。</p>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="bg-white/5 p-4 rounded-[1.25rem] border border-white/5">
+                    <label className="text-[10px] font-black text-stone-400 block mb-2 ml-1">現在の連続日数</label>
+                    <div className="flex gap-2 items-center bg-black/40 p-1.5 rounded-xl border border-white/5">
+                      <input type="number" className="flex-1 bg-transparent border-none text-white font-black text-xl px-3 outline-none" value={editStreak} onChange={e => setEditStreak(parseInt(e.target.value) || 0)} />
+                      <button onClick={handleSaveStreak} className="bg-[#f97316] text-white text-[10px] font-black py-2 px-4 rounded-lg shadow-lg active:scale-95 transition-all">保存</button>
+                    </div>
+                  </div>
+                  <div className="bg-white/5 p-4 rounded-[1.25rem] border border-white/5">
+                    <label className="text-[10px] font-black text-stone-400 block mb-2 ml-1">ご褒美ストック数</label>
+                    <div className="flex gap-2 items-center bg-black/40 p-1.5 rounded-xl border border-white/5">
+                      <input type="number" className="flex-1 bg-transparent border-none text-white font-black text-xl px-3 outline-none" value={challengeSettings.owned_rewards || 0} onChange={e => setChallengeSettings({...challengeSettings, owned_rewards: parseInt(e.target.value) || 0})} />
+                      <button onClick={() => saveChallengeSettings(challengeSettings)} className="bg-[#eab308] text-white text-[10px] font-black py-2 px-4 rounded-lg shadow-lg active:scale-95 transition-all">保存</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {adminTab === 'add_word' && (
+            /* 省略：前回のコードと同じ */
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-md border-2 border-stone-100 text-left">
+              <h3 className="font-black text-indigo-700 mb-6 text-xl">➕ 新しい言葉の登録</h3>
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <input className="border-2 border-stone-100 p-4 rounded-2xl font-black text-2xl outline-none focus:border-indigo-400 bg-stone-50 shadow-inner" placeholder="漢字" value={newWord.kanji} onChange={e => setNewWord({...newWord, kanji: e.target.value})} />
+                  <input className="border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner" placeholder="読み" value={newWord.reading} onChange={e => setNewWord({...newWord, reading: e.target.value})} />
+                </div>
+                <select className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold bg-stone-50 outline-none focus:border-indigo-400" value={newWord.category} onChange={e => setNewWord({...newWord, category: e.target.value})}>
+                  {CATEGORIES.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <textarea className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner min-h-[120px]" placeholder="例文" value={newWord.usage_example} onChange={e => setNewWord({...newWord, usage_example: e.target.value})} />
+                <button onClick={onAddWordClick} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition hover:bg-indigo-700">追加する 🐾</button>
+              </div>
+            </div>
+          )}
+
+          {adminTab === 'manage' && (
+            /* 省略：前回のコードと同じ */
+            <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 text-left">
+              <div className="flex items-center justify-between mb-6 px-2">
+                <h3 className="font-black text-slate-700 text-xl flex items-center gap-2">📝 編集・削除</h3>
+                <span className="text-[10px] font-black text-stone-400 bg-stone-100 px-3 py-1 rounded-full">全 {allWordsList.length} 件</span>
+              </div>
+              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 no-scrollbar">
+                {allWordsList.map((w: any) => {
+                  const category = CATEGORIES.find((c: any) => c.id === w.kanji_level);
+                  const nParts = category?.name?.split('(') || [];
+                  const [shortName] = nParts;
+                  const displayName = shortName || w.kanji_level;
+                  return (
+                    <div key={w.id} className="bg-stone-50/50 rounded-2xl p-4 border-2 border-stone-50 shadow-sm flex items-center gap-4 group hover:border-sky-100 transition-all">
+                      <div className="text-3xl grayscale group-hover:grayscale-0 transition-all drop-shadow-sm">{w.emoji || '📝'}</div>
+                      <div className="flex-1 min-w-0 text-left">
+                         <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-black text-lg text-sky-700 truncate">{w.kanji}</span>
+                            <span className="text-[9px] px-2 py-0.5 bg-white border border-stone-100 rounded-lg font-black text-stone-400 uppercase tracking-tighter">{displayName}</span>
+                         </div>
+                         <p className="text-xs font-bold text-stone-500 truncate">{w.reading}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                         <button onClick={() => toggleMasterStatus(w.id, w.currentStatus)} className={`px-4 py-2 rounded-xl text-[10px] font-black shadow-sm transition-all border-b-2 active:translate-y-0.5 active:border-b-0 ${w.currentStatus === 'gold' ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-white text-stone-300 border-stone-100'}`}>
+                           {w.currentStatus === 'gold' ? '👑 解除' : '👑 習得'}
+                         </button>
+                         <button onClick={() => handleDeleteWord(w.id)} className="bg-white text-rose-400 p-2 rounded-xl border border-rose-50 hover:bg-rose-100 hover:text-rose-500 transition-all shadow-sm">削除</button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="components/CollectionScreen.tsx">
+'use client'
+import React, { useState, useMemo } from 'react';
+import { CATEGORIES } from '@/lib/constants';
+
+type CollectionScreenProps = {
+    currentUser: any;
+    setView: (view: string) => void;
+    allWordsList: any[];
+    challengeSettings: any; // ★ 追加：豆知識（unlocked_tips）が入っている
+    speakWord: (text: string) => void;
+    renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
+    getFullReading: (reading: string, okurigana?: string | null) => string;
+    stopSpeaking: () => void;
+    onViewCard?: () => void;
+};
+
+export default function CollectionScreen(props: CollectionScreenProps) {
+    const { 
+        currentUser, setView, allWordsList, challengeSettings, 
+        speakWord, renderReading, getFullReading, stopSpeaking, onViewCard 
+    } = props;
+    
+    // 表示モード切り替え ('words' | 'tips')
+    const [mainTab, setMainTab] = useState<'words'|'tips'>('words');
+    // 級の選択状態（null の時はリストを表示）
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [flashcardMode, setFlashcardMode] = useState<'normal'|'hide_kanji'|'hide_reading'>('normal');
+    const [revealedCards, setRevealedCards] = useState<number[]>([]);
+
+    // 豆知識（宝箱から出たヒント）
+    const unlockedTips = challengeSettings?.unlocked_tips || [];
+
+    // 各級の進捗計算（リスト表示用）
+    const categoryStats = useMemo(() => {
+        return CATEGORIES.map(cat => {
+            const words = allWordsList.filter(w => w.kanji_level === cat.id);
+            const [total] = [words.length];
+            const mastered = words.filter(w => w.currentStatus === 'gold').length;
+            return { ...cat, total, mastered };
+        });
+    }, [allWordsList]);
+
+    // フィルタリングされた単語
+    const filteredWords = useMemo(() => {
+        return allWordsList.filter(w => {
+            if (w.kanji_level !== selectedCategory) return false;
+            if (searchQuery && !w.kanji.includes(searchQuery) && !w.reading.includes(searchQuery)) return false;
+            return true;
+        });
+    }, [allWordsList, selectedCategory, searchQuery]);
+
+    const toggleCardReveal = (w: any) => { 
+        if (revealedCards.includes(w.id)) {
+            setRevealedCards(revealedCards.filter(rid => rid !== w.id)); 
+            stopSpeaking();
+        } else {
+            if (onViewCard) onViewCard();
+            setRevealedCards([...revealedCards, w.id]);
+            // ★ 自動読み上げは停止（ユーザーの指示によりボタン式へ）
+        }
+    };
+
+    return (
+        <div className={`min-h-screen ${currentUser.light} p-4 font-sans pb-24`}>
+          <div className="max-w-2xl mx-auto">
+            
+            {/* ヘッダー */}
+            <div className="flex justify-between items-center mb-6">
+              <button 
+                onClick={() => { 
+                    if (selectedCategory) { setSelectedCategory(null); } 
+                    else { setView('menu'); stopSpeaking(); } 
+                }} 
+                className="text-stone-500 font-black bg-white px-5 py-2 rounded-full shadow-sm hover:bg-stone-50 transition active:scale-95"
+              >
+                {selectedCategory ? '← もどる' : '🏠 むらへ'}
+              </button>
+              <h2 className="text-xl font-black text-stone-700 tracking-tighter">
+                {mainTab === 'words' ? '📖 言葉の図鑑' : '🎁 たからもの'}
+              </h2>
+            </div>
+
+            {/* メインタブ切り替え (図鑑 or 豆知識) */}
+            <div className="flex p-1 bg-stone-200/50 rounded-2xl mb-6">
+                <button 
+                    onClick={() => setMainTab('words')} 
+                    className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'words' ? 'bg-white text-emerald-600 shadow-md' : 'text-stone-500'}`}
+                >
+                    漢字ずかん
+                </button>
+                <button 
+                    onClick={() => setMainTab('tips')} 
+                    className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'tips' ? 'bg-amber-700 text-amber-100 shadow-md' : 'text-stone-500'}`}
+                >
+                    豆知識 ({unlockedTips.length})
+                </button>
+            </div>
+
+            {/* ==========================================
+                漢字図鑑モード
+               ========================================== */}
+            {mainTab === 'words' && (
+              <>
+                {/* 級の選択リスト (タスク 3-2: リスト形式) */}
+                {!selectedCategory ? (
+                    <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4">
+                        {categoryStats.map(cat => (
+                            <button 
+                                key={cat.id} 
+                                onClick={() => setSelectedCategory(cat.id)}
+                                className="w-full bg-white p-5 rounded-[1.5rem] shadow-sm border-b-4 border-stone-200 flex items-center justify-between group active:scale-98 transition-all"
+                            >
+                                <div className="text-left">
+                                    <p className="text-lg font-black text-stone-700">{cat.name}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <div className="w-24 h-2 bg-stone-100 rounded-full overflow-hidden">
+                                            <div 
+                                                className="h-full bg-emerald-500 transition-all duration-1000" 
+                                                style={{ width: `${(cat.mastered / (cat.total || 1)) * 100}%` }}
+                                            ></div>
+                                        </div>
+                                        <span className="text-[10px] font-black text-stone-400">{cat.mastered} / {cat.total}</span>
+                                    </div>
+                                </div>
+                                <span className="text-stone-300 group-hover:text-emerald-500 transition-colors">▶︎</span>
+                            </button>
+                        ))}
+                    </div>
+                ) : (
+                    /* 単語グリッド表示 */
+                    <div className="animate-in fade-in zoom-in-95 duration-300">
+                        <div className="bg-white rounded-3xl p-5 shadow-md border-2 border-stone-100 mb-6">
+                          <input 
+                            type="text" 
+                            placeholder="かんじ・よみでさがす..." 
+                            className="w-full bg-stone-50 border-2 border-stone-100 rounded-2xl py-3 px-5 mb-4 font-bold outline-none focus:border-emerald-400 text-stone-700" 
+                            value={searchQuery} 
+                            onChange={(e) => setSearchQuery(e.target.value)} 
+                          />
+                          <div className="grid grid-cols-3 gap-2 p-1 bg-stone-100 rounded-2xl">
+                            <button onClick={() => setFlashcardMode('normal')} className={`py-2 rounded-xl text-xs font-black ${flashcardMode === 'normal' ? 'bg-white shadow-sm text-emerald-600' : 'text-stone-500'}`}>すべて</button>
+                            <button onClick={() => setFlashcardMode('hide_reading')} className={`py-2 rounded-xl text-xs font-black ${flashcardMode === 'hide_reading' ? 'bg-sky-500 text-white shadow-sm' : 'text-stone-500'}`}>よみ隠す</button>
+                            <button onClick={() => setFlashcardMode('hide_kanji')} className={`py-2 rounded-xl text-xs font-black ${flashcardMode === 'hide_kanji' ? 'bg-orange-500 text-white shadow-sm' : 'text-stone-500'}`}>漢字隠す</button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                          {filteredWords.map((w) => (
+                            <div key={w.id} onClick={() => toggleCardReveal(w)} className="bg-white rounded-[2rem] p-3 border-b-4 border-stone-200 shadow-sm flex flex-col items-center justify-center relative aspect-square cursor-pointer active:scale-95 transition-transform overflow-hidden">
+                              <div className="text-2xl mb-1">{w.emoji}</div>
+                              <div className="relative w-full text-center">
+                                <span className="text-3xl font-black text-stone-800 leading-none block truncate">{w.kanji}</span>
+                                {flashcardMode === 'hide_kanji' && !revealedCards.includes(w.id) && (
+                                  <div className="absolute inset-0 bg-stone-800 rounded-xl flex items-center justify-center"><span className="text-white text-xl">?</span></div>
+                                )}
+                              </div>
+                              <div className="relative mt-2 w-full text-center">
+                                <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full inline-block truncate max-w-full">{w.reading}</span>
+                                {flashcardMode === 'hide_reading' && !revealedCards.includes(w.id) && (
+                                  <div className="absolute inset-0 bg-stone-600 rounded-full flex items-center justify-center w-[80%] mx-auto"><span className="text-white text-[9px]">?</span></div>
+                                )}
+                              </div>
+                              {w.currentStatus === 'gold' && <div className="absolute top-2 right-2 text-xs">👑</div>}
+                            </div>
+                          ))}
+                        </div>
+                    </div>
+                )}
+              </>
+            )}
+
+            {/* ==========================================
+                豆知識モード (タスク 2-2: 宝箱UI)
+               ========================================== */}
+            {mainTab === 'tips' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    {unlockedTips.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-6">
+                            {unlockedTips.map((tip: string, i: number) => (
+                                <div key={i} className="relative group">
+                                    {/* 巻物（羊皮紙）風の背景 */}
+                                    <div className="absolute -inset-1 bg-amber-200/30 rounded-[2rem] blur-sm"></div>
+                                    <div className="relative bg-[#fdf6e3] p-8 rounded-[1.5rem] shadow-xl border-x-[12px] border-amber-900/10 overflow-hidden">
+                                        {/* 飾り */}
+                                        <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-amber-800/20 rounded-tl-3xl"></div>
+                                        <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-amber-800/20 rounded-br-3xl"></div>
+                                        
+                                        <div className="flex items-start gap-4">
+                                            <span className="text-4xl drop-shadow-md shrink-0">📜</span>
+                                            <p className="text-lg font-black text-amber-900 leading-relaxed text-left font-serif italic">
+                                                {tip}
+                                            </p>
+                                        </div>
+                                        <p className="text-right text-[10px] font-black text-amber-800/40 mt-4 tracking-tighter">DISCOVERED TIP #{i+1}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="bg-white/50 border-4 border-dashed border-stone-200 rounded-[3rem] p-16 text-center">
+                            <p className="text-6xl mb-6 grayscale opacity-30">📦</p>
+                            <p className="text-stone-400 font-black">まだお宝がありません。<br/>冒険（10分学習）をして<br/>宝箱をみつけよう！</p>
+                        </div>
+                    )}
+                </div>
+            )}
+          </div>
+
+          {/* ==========================================
+              詳細カード (タスク 3-1: 読み上げ制限)
+             ========================================== */}
+          {revealedCards.length > 0 && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/90 backdrop-blur-md animate-in fade-in" onClick={() => setRevealedCards([])}>
+              {allWordsList.filter(x => revealedCards.includes(x.id)).map(sw => (
+                <div key={sw.id} className="bg-white w-full max-w-sm rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in duration-300 flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+                  
+                  <div className="p-10 text-center bg-stone-50 border-b-2 border-stone-100 shrink-0 relative">
+                    {sw.currentStatus === 'gold' && <div className="absolute top-6 right-8 text-4xl">👑</div>}
+                    <div className="text-6xl mb-4">{sw.emoji}</div>
+                    <h2 className="text-8xl font-black text-stone-800 mb-4">{sw.kanji}</h2>
+                    
+                    {/* ★ タスク 3-1: 読み上げボタン */}
+                    <div className="flex items-center justify-center gap-3">
+                        <div className="text-3xl font-black text-sky-600 bg-sky-50 px-8 py-3 rounded-full border-2 border-sky-100 shadow-inner">
+                            {renderReading(sw.reading, sw.okurigana)}
+                        </div>
+                        <button 
+                            onClick={() => speakWord(getFullReading(sw.reading, sw.okurigana))}
+                            className="w-14 h-14 bg-sky-500 text-white rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform hover:bg-sky-400"
+                        >
+                            <span className="text-2xl">🔊</span>
+                        </button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-8 space-y-5 overflow-y-auto no-scrollbar bg-white flex-1">
+                    {sw.usage_example && (
+                      <div className="bg-emerald-50/50 p-5 rounded-[2rem] border-2 border-emerald-100/50 text-left">
+                        <span className="text-xs font-black text-emerald-500 block mb-2">💡 例文でチェック</span>
+                        <p className="text-lg font-bold text-stone-700 leading-relaxed">「{sw.usage_example}」</p>
+                      </div>
+                    )}
+                    {sw.origin_logic && (
+                      <div className="bg-amber-50/50 p-5 rounded-[2rem] border-2 border-amber-100/50 text-left">
+                        <span className="text-xs font-black text-amber-500 block mb-2">📜 なりたち</span>
+                        <p className="text-lg font-bold text-amber-900/80 leading-relaxed">{sw.origin_logic}</p>
+                      </div>
+                    )}
+                  </div>
+  
+                  <div className="p-6 bg-stone-50 shrink-0">
+                    <button onClick={() => setRevealedCards([])} className="w-full py-5 bg-stone-800 text-white rounded-[1.5rem] font-black text-xl shadow-xl active:scale-95 transition">ずかんを閉じる 🐾</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+}
+</file>
+
+<file path="components/MenuScreen.tsx">
+'use client'
+import React, { useState } from 'react'
+import { USERS, CATEGORIES, MODE_NAMES, getUserFirstName, getDailyMessage } from '@/lib/constants'
+
+// Homeコンポーネントから受け取るデータと関数の「型」を定義
+type MenuScreenProps = {
+  currentUser: any;
+  setCurrentUser: (user: any) => void;
+  dailyProgress: any;
+  challengeSettings: any;
+  targetKyu: string;
+  setTargetKyu: (kyu: string) => void;
+  selectedInputMode: string;
+  setSelectedInputMode: (mode: any) => void;
+  rickMode: string;
+  setRickMode: (mode: any) => void;
+  reviewCandidates: any[];
+  reviewRevealed: number[];
+  toggleReviewReveal: (id: number) => void;
+  hasParentChallenge: boolean;
+  startGame: (mode: string) => void;
+  setView: (view: any) => void;
+  fetchCollection: () => void;
+  renderCalendar: () => React.ReactNode;
+  stopSpeaking: () => void;
+  fetchAdminStats: (user: any) => void;
+  setAdminTargetUser: (user: any) => void;
+  renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
+}
+
+export default function MenuScreen(props: MenuScreenProps) {
+  // プロパティを分割代入で受け取り
+  const { 
+    currentUser, setCurrentUser, dailyProgress, challengeSettings, 
+    targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode,
+    rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal,
+    hasParentChallenge, startGame, setView, fetchCollection, renderCalendar,
+    stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading
+  } = props;
+
+  // ★ 豆知識ノート表示用のState
+  const [showTipsModal, setShowTipsModal] = useState(false);
+
+  // 変数展開（分割代入の徹底）
+  const streakData = [dailyProgress?.streak || 0];
+  const [streak] = streakData;
+
+  const goalData = [challengeSettings?.reward_goal_days || 14];
+  const [goal] = goalData;
+
+  const rewardTextData = [challengeSettings?.reward_text || '好きなおやつ'];
+  const [rewardName] = rewardTextData;
+
+  const tipsData = [challengeSettings?.unlocked_tips || []];
+  const [unlockedTips] = tipsData;
+  
+  // 次のご褒美メッセージの計算
+  const remainder = streak % goal;
+  const daysUntil = (remainder === 0 && streak > 0) ? goal : goal - remainder;
+  const nextRewardMsg = (remainder === 0 && streak > 0) 
+    ? `🎉 目標の${goal}日達成！${rewardName}をGET！` 
+    : `あと${daysUntil}日で${rewardName}！🎁`;
+
+  const isRickDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['rick_challenge'] && d.result === 'done'); 
+  const isParentDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['parent_challenge'] && d.result === 'done'); 
+  const isWeekendDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['weekend'] && d.result === 'done'); 
+  
+  const displayCountData = [challengeSettings?.quest_count || 5];
+  const [displayCount] = displayCountData;
+
+  return (
+    <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans transition-colors duration-500`}>
+      
+      {/* ユーザー切り替え */}
+      <div className="absolute top-4 right-4 flex flex-wrap justify-end gap-2 max-w-[70%]">
+        {USERS.map((u: any) => (
+          <button key={u.id} onClick={() => setCurrentUser(u)} className={`px-3 py-1.5 rounded-full text-xs font-black transition-all shadow-sm ${currentUser.id === u.id ? `bg-gradient-to-r ${u.hue} text-white scale-110 ring-2 ring-white/50` : 'bg-white/50 text-stone-500 opacity-90 hover:bg-white'}`}>
+            {getUserFirstName(u.name)}
+          </button>
+        ))}
+      </div>
+
+      {/* ナビゲーターRick */}
+      <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-xl mb-4 relative mt-4">
+        <img src="/Rick.png" alt="Rick" className="w-full h-full object-cover" />
+        <div className="absolute bottom-0 left-0 right-0 bg-stone-900/40 text-white text-[10px] text-center font-bold py-0.5 backdrop-blur-sm tracking-widest">ナビゲーター</div>
+      </div>
+      <h1 className={`text-3xl font-black ${currentUser.text} mb-2 tracking-widest drop-shadow-sm`}>毎日漢検クエスト</h1>
+      
+      {/* 設定エリア */}
+      <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">
+          <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🎯</span> 出題するカテゴリ</p>
+          <select value={targetKyu} onChange={e => setTargetKyu(e.target.value)} className="w-full p-3 border-2 border-stone-200 rounded-xl text-sm font-black text-stone-700 bg-stone-50 outline-none focus:border-sky-400 mb-5 text-center shadow-inner">
+            <option value="all">すべてのカテゴリから出題</option>
+            {CATEGORIES.filter((c: any) => c.id !== 'general').map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+
+          <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🕹️</span> 回答モード</p>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <button onClick={() => setSelectedInputMode('quiz_kanji')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'quiz_kanji' ? `bg-orange-500 text-white border-orange-600 shadow-md` : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>🔘 4択で選ぶ</button>
+            <button onClick={() => setSelectedInputMode('typing_read')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'typing_read' ? 'bg-indigo-500 text-white border-indigo-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>⌨️ 読み入力</button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setSelectedInputMode('write_canvas')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'write_canvas' ? 'bg-emerald-500 text-white border-emerald-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>✍️ 手書き</button>
+            <button onClick={() => setSelectedInputMode('write_self')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'write_self' ? 'bg-sky-500 text-white border-sky-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>🧠 自己判定</button>
+          </div>
+      </div>
+      
+      {/* 👑 ご褒美・連続記録エリア */}
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-5 mb-5 border-b-4 border-stone-200 relative overflow-hidden">
+          <div className="absolute -right-4 -top-4 text-6xl opacity-10">🔥</div>
+          <p className="text-xs font-black text-sky-600 mb-2 animate-pulse">{getDailyMessage(currentUser.id)}</p>
+          
+          <div className="flex justify-between items-center mb-4 px-2">
+            <div className="text-left">
+              <p className="text-[10px] text-stone-400 font-bold mb-0.5">現在の連続クリア</p>
+              <p className="text-4xl font-black text-orange-500 tracking-tighter">{streak} <span className="text-lg">日</span></p>
+            </div>
+            <div className="text-right bg-yellow-50 p-2 rounded-2xl border-2 border-yellow-100 shadow-inner min-w-[100px]">
+              <p className="text-[9px] font-black text-yellow-600 mb-0.5">持っている数</p>
+              <p className="text-2xl font-black text-yellow-500">{challengeSettings?.owned_rewards || 0} <span className="text-xs">個</span></p>
+            </div>
+          </div>
+
+          <div className="bg-orange-50 border border-orange-200 text-orange-600 font-black py-2 px-4 rounded-2xl text-sm inline-block shadow-sm w-full mb-3">
+            {nextRewardMsg}
+          </div>
+
+          {/* ご褒美ルールの説明（折りたたみ） */}
+<div className="mt-3 border-t border-stone-100 pt-3">
+  <details className="group">
+    <summary className="list-none cursor-pointer">
+      <div className="text-[10px] font-black text-stone-400 flex items-center justify-center gap-1 group-open:text-sky-500 transition-colors">
+        <span>📜</span> ご褒美をもらうためのヒント {/* ぼかした表現 */}
+        <span className="transition-transform group-open:rotate-180">▼</span>
+      </div>
+    </summary>
+    <div className="mt-2 bg-stone-50 p-3 rounded-xl text-[11px] font-bold text-stone-600 leading-relaxed text-left animate-in fade-in slide-in-from-top-1">
+      <p>・しっかり集中して、漢字の世界を冒険しよう！</p>
+      <p>・10分くらい、問題を解いたり図鑑をながめていると、クリアしたあとに宝箱が出るかも...？</p>
+      <p>・「手書き」や「自己判定」で頑張ると、いいことがあるかも！？</p>
+      <p className="text-[9px] text-stone-400 mt-2">※ 途中で画面を閉じると、時間はリセットされるから注意してね！</p>
+    </div>
+  </details>
+</div>
+
+          {/* ★ 豆知識ノートへの入り口 */}
+          <button 
+  onClick={() => setShowTipsModal(true)} 
+  className="w-full bg-gradient-to-b from-amber-700 to-amber-900 text-amber-100 font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center gap-3 shadow-[0_5px_0_0_rgba(69,26,3,1)] hover:brightness-110 mb-2"
+>
+  <span className="text-2xl">🎁</span>
+  <div className="text-left leading-tight">
+    <p className="text-[10px] text-amber-300/80">あつめたお宝</p>
+    <p className="text-sm tracking-widest">豆知識コレクション ({unlockedTips.length})</p>
+  </div>
+</button>
+      </div>
+
+      {/* 復習カード */}
+      {reviewCandidates.length > 0 && (
+        <div className="w-full max-w-sm mb-6 animate-in slide-in-from-top duration-500">
+          <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-rose-200 text-rose-700 text-xs font-bold px-3 py-1 rounded-bl-xl shadow-sm">⚠️ 要復習</div>
+            <h3 className="font-bold text-rose-600 mb-3 text-sm flex items-center gap-1">Rickからの挑戦状 <span className="text-xl">🦴</span></h3>
+            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+              {reviewCandidates.map((w: any) => {
+                const isRevealed = reviewRevealed.includes(w.id)
+                return (
+                  <div key={w.id} onClick={() => toggleReviewReveal(w.id)} className="min-w-[100px] h-32 bg-white rounded-xl shadow-sm flex flex-col items-center justify-center p-2 cursor-pointer active:scale-95 transition border-b-4 border-rose-200">
+                    {!isRevealed ? (
+                      <div className="text-center animate-in zoom-in w-full"><p className="font-black text-stone-800 text-4xl leading-tight break-words">{w.kanji}</p><p className="font-bold text-rose-400 text-lg mt-2">?</p></div>
+                    ) : (
+                      <div className="text-center animate-in zoom-in w-full"><div className="text-3xl mb-1">{w.emoji}</div><p className="font-bold text-sky-600 text-xs leading-tight bg-sky-50 px-2 py-0.5 rounded">{renderReading(w.reading, w.okurigana)}</p></div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 今日の進捗バー */}
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-6 mb-6 relative border-2 border-stone-50">
+        <div className="flex items-center justify-between mb-3"><span className="text-stone-500 font-bold text-sm">📅 今日の進捗</span><span className={`text-2xl font-black ${currentUser.text}`}>{dailyProgress?.count || 0} <span className="text-base text-stone-400">/ {displayCount} 問</span></span></div>
+        <div className="w-full bg-stone-100 rounded-full h-5 shadow-inner p-0.5"><div className={`h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${currentUser.hue}`} style={{ width: `${Math.min(((dailyProgress?.count || 0) / displayCount) * 100, 100)}%` }}></div></div>
+        {dailyProgress?.is_completed ? <p className="text-center text-orange-500 font-bold mt-3 animate-bounce">💮 今日のノルマ達成！えらい！</p> : <p className="text-center text-stone-400 text-xs mt-3 font-bold">目標まであと {Math.max(0, displayCount - (dailyProgress?.count || 0))} 問！</p>}
+      </div>
+      
+      {/* メインアクションボタン */}
+      <div className="space-y-3 w-full max-w-sm mb-6">
+        {hasParentChallenge && (
+          <button onClick={() => { if (!isParentDone) startGame('parent_challenge'); }} className={`w-full py-4 px-6 rounded-2xl font-black shadow-lg transform transition-all flex items-center justify-between ${isParentDone ? 'bg-stone-200 text-white shadow-none' : 'bg-gradient-to-r from-rose-500 to-orange-500 text-white animate-pulse active:scale-95'}`}>
+            <div className="flex items-center gap-3"><span className="text-2xl">🔥</span> <span className="tracking-wide">パパからの挑戦状</span></div>
+            {isParentDone && <span className="bg-white/30 px-3 py-1 rounded-full text-xs">クリア済</span>}
+          </button>
+        )}
+
+        <button onClick={() => { if (!dailyProgress?.is_completed) startGame('daily'); }} className={`w-full py-5 px-6 rounded-2xl font-black shadow-xl transform transition-all flex items-center justify-between ${dailyProgress?.is_completed ? 'bg-sky-200 text-white shadow-none' : `bg-gradient-to-r ${currentUser.hue} text-white hover:opacity-90 active:scale-95`}`}>
+          <div className="flex items-center gap-3"><span className="text-3xl">🚀</span> <span className="text-xl tracking-wider">今日の冒険へ</span></div>
+          {dailyProgress?.is_completed ? <span className="bg-white/30 px-3 py-1 rounded-full text-xs">クリア済</span> : <span className="bg-white/30 px-3 py-1 rounded-full text-sm">{displayCount}問</span>}
+        </button>
+        
+        {/* Rickの特訓 */}
+        <div className={`w-full p-4 rounded-2xl shadow-md border-2 transition-all ${isRickDone ? 'bg-stone-100 border-stone-200' : 'bg-white border-stone-100'}`}>
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2"><span className="text-xl">⚡</span> <span className={`font-bold ${isRickDone ? 'text-stone-400' : 'text-stone-700'}`}>Rickの特訓</span></div>
+                {isRickDone && <span className="text-xs text-stone-400 font-bold">クリア済</span>}
+            </div>
+            <div className="flex gap-1 mb-3">
+                <button onClick={() => setRickMode('read')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'read' ? 'bg-orange-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>👀 読む</button>
+                <button onClick={() => setRickMode('think')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'think' ? 'bg-sky-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>🧠 思い</button>
+                <button onClick={() => setRickMode('write')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'write' ? 'bg-emerald-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>✍️ 手書き</button>
+            </div>
+            <button onClick={() => { if (!isRickDone) startGame('rick_challenge'); }} className={`w-full py-3 rounded-xl font-black text-sm tracking-widest transition-all ${isRickDone ? 'bg-stone-200 text-white cursor-not-allowed' : 'bg-stone-800 text-white shadow-md active:scale-95 hover:bg-stone-700'}`}>特訓スタート！</button>
+        </div>
+
+        <button onClick={() => startGame('weekend')} className={`w-full py-3 px-6 rounded-2xl font-bold shadow-md transform transition-all flex items-center justify-between ${isWeekendDone ? 'bg-stone-200 text-white shadow-none' : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white active:scale-95'}`}>
+          <div className="flex items-center gap-3"><span className="text-xl">🏰</span> <span>週末ボスバトル</span></div>
+          {isWeekendDone && <span className="bg-white/30 px-3 py-1 rounded-full text-xs">撃破済</span>}
+        </button>
+
+        <button onClick={() => startGame('revenge')} className="w-full py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-stone-800 text-rose-400 border-b-4 border-stone-900 hover:bg-stone-700 active:translate-y-1 active:border-b-0 tracking-widest gap-2"><span className="text-xl">💀</span> リベンジ (無限復習)</button>
+
+        <div className="flex space-x-3 mt-4">
+          <button onClick={fetchCollection} className="flex-1 bg-white border-b-4 border-emerald-500 text-emerald-600 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">📖</span> 図鑑</button>
+          <button onClick={() => startGame('free')} className="flex-1 bg-white border-b-4 border-sky-400 text-sky-500 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">⚔️</span> フリー</button>
+        </div>
+      </div>
+
+      {/* カレンダー */}
+      <div className="mb-6 w-full max-w-sm">{renderCalendar()}</div>
+
+      {/* パパ・ママからのお返事 */}
+      {dailyProgress?.parent_reply && (
+        <div className="mb-8 w-full max-w-sm bg-white border-4 border-orange-200 rounded-3xl p-6 shadow-lg relative">
+          <div className="absolute -top-4 left-6 bg-orange-400 text-white text-xs font-black tracking-widest px-4 py-1.5 rounded-full shadow-sm">パパ・ママからのお返事</div>
+          <p className="text-left text-base font-bold text-stone-700 whitespace-pre-wrap leading-relaxed mt-2">「{dailyProgress.parent_reply}」</p>
+        </div>
+      )}
+
+    
+{/* 保護者（kenta, mami）のみに表示される入り口 */}
+{(currentUser.id === 'kenta' || currentUser.id === 'mami') && (
+  <button 
+    onClick={() => { stopSpeaking(); fetchAdminStats(currentUser); setAdminTargetUser(currentUser); setView('admin'); }} 
+    className="mb-8 bg-stone-800 hover:bg-stone-900 text-white font-black py-4 px-8 rounded-2xl w-full max-w-xs shadow-xl text-sm transition-all active:scale-95 border-b-4 border-stone-950 flex items-center justify-center gap-2"
+  >
+    <span>👨‍👩‍👧‍👦</span> 保護者管理メニュー
+  </button>
+)}
+
+      {/* ==========================================
+          ★ 豆知識ノート（モーダル画面）
+      ========================================== */}
+      {showTipsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in" onClick={() => setShowTipsModal(false)}>
+          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            
+            <div className="bg-yellow-50 p-6 text-center border-b-4 border-yellow-100 shrink-0">
+              <h3 className="text-2xl font-black text-yellow-600 flex items-center justify-center gap-2"><span>📚</span> 秘密の豆知識ノート</h3>
+              <p className="text-xs font-bold text-yellow-700 mt-2">今まで集めた知識：{unlockedTips.length}個</p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto bg-stone-50 flex-1 space-y-3 no-scrollbar">
+              {unlockedTips.length > 0 ? (
+                unlockedTips.map((tip: string, i: number) => (
+                  <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-stone-100">
+                    <p className="text-sm font-bold text-stone-700 leading-relaxed">{tip}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-10">
+                  <p className="text-4xl mb-4">🔒</p>
+                  <p className="text-stone-400 font-bold leading-relaxed">まだ豆知識がありません。<br/>10分しっかり勉強して<br/>クリア後の宝箱を開けよう！</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 bg-white border-t border-stone-100 shrink-0">
+              <button onClick={() => setShowTipsModal(false)} className="w-full py-4 bg-stone-800 text-white rounded-2xl font-black text-lg shadow-lg active:scale-95 transition">村へもどる 🐾</button>
+            </div>
+            
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+</file>
+
+<file path="app/page.tsx">
+// app/page.tsx
+'use client'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { supabase } from "@/lib/supabaseClient";
+import confetti from 'canvas-confetti'
+import { USERS, MODE_NAMES, CATEGORIES } from '@/lib/constants'
+import type { KanjiWord, ProgressStats } from '@/lib/constants'
+
+// コンポーネントのインポート
+import MenuScreen from '@/components/MenuScreen'
+import AdminScreen from '@/components/AdminScreen'
+import GameScreen from '@/components/GameScreen'
+import CollectionScreen from '@/components/CollectionScreen'
+
+// --- ヘルパー関数 ---
+const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+const formatDate = (dateObj: Date) => {
+    const y = dateObj.getFullYear();
+    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const d = String(dateObj.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+const getTodayJST = () => formatDate(getJSTDate());
+const getYesterdayJST = () => {
+    const dObj = getJSTDate();
+    dObj.setDate(dObj.getDate() - 1);
+    return formatDate(dObj);
+};
+const getJSTTimeString = () => getJSTDate().toLocaleTimeString('ja-JP', { hour12: false });
+
+export default function Home() {
+  const [defaultUser] = USERS;
+  
+  // --- 基本ステート ---
+  const [currentUser, setCurrentUser] = useState(defaultUser)
+  const [view, setView] = useState<'menu'|'game'|'rick_challenge'|'result'|'admin'|'collection'>('menu')
+  const [mode, setMode] = useState<'daily'|'free'|'weekend'|'parent_challenge'|'rick_challenge'|'revenge'>('daily')
+  const [loading, setLoading] = useState(false); 
+  const [targetKyu, setTargetKyu] = useState<string>('all')
+  const [selectedInputMode, setSelectedInputMode] = useState<'quiz_kanji'|'typing_read'|'write_canvas'|'write_self'>('quiz_kanji')
+  const [rickMode, setRickMode] = useState<'read'|'think'|'write'>('read')
+  const [adminTargetUser, setAdminTargetUser] = useState(defaultUser)
+  const [allWordsList, setAllWordsList] = useState<any[]>([]); 
+  const [selectedLogDate, setSelectedLogDate] = useState<string|null>(null); 
+  const [editStreak, setEditStreak] = useState(0)
+  const [challengeSettings, setChallengeSettings] = useState<any>({ mode: 'auto', selected_ids: [], auto_count: 5, quest_count: 5, special_quest_count: 10, challenge_quest_count: 8, reward_goal_days: 14, reward_text: '好きなおやつ', owned_rewards: 0, total_earned_rewards: 0, unlocked_tips: [] })
+  const [hasParentChallenge, setHasParentChallenge] = useState(false); 
+  const [calendarDate, setCalendarDate] = useState<Date>(getJSTDate())
+  const [dailyProgress, setDailyProgress] = useState<any>({ id: 0, date: getTodayJST(), count: 0, is_completed: false, study_time_seconds: 0, collection_views: 0, streak: 0 })
+  const [monthlyLogs, setMonthlyLogs] = useState<any[]>([]); 
+  const [stats, setStats] = useState<ProgressStats | null>(null)
+  
+  // Rickの挑戦状（復習カード）用ステート
+  const [reviewCandidates, setReviewCandidates] = useState<KanjiWord[]>([])
+  const [reviewRevealed, setReviewRevealed] = useState<number[]>([]);
+
+  // --- ゲーム進行ステート ---
+  const [currentGameGoal, setCurrentGameGoal] = useState(5); 
+  const [questQueue, setQuestQueue] = useState<KanjiWord[]>([]); 
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [cachedAllWords, setCachedAllWords] = useState<KanjiWord[]>([]);
+  const [bossHp, setBossHp] = useState(10); 
+  const [userAnswer, setUserAnswer] = useState('')
+  const [message, setMessage] = useState(''); 
+  const [showRick, setShowRick] = useState(false); 
+  const [mistakeCount, setMistakeCount] = useState(0); 
+  const [feedbackMsg, setFeedbackMsg] = useState<React.ReactNode | null>(null)
+  const [showHint, setShowHint] = useState(false);
+  const [showFlashAnswer, setShowFlashAnswer] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false); 
+  const [langMode, setLangMode] = useState<'kanji_to_read'|'read_to_kanji'>('read_to_kanji')
+  const [options, setOptions] = useState<KanjiWord[]>([])
+  const [isListening, setIsListening] = useState(false)
+  const [rewardTipsList, setRewardTipsList] = useState<string[]>([]);
+  const [openedChests, setOpenedChests] = useState<number[]>([]);
+
+  // --- キャンバス・自己判定用ステート ---
+  const canvasRef = useRef<HTMLCanvasElement>(null!);
+  const [gameStep, setGameStep] = useState(0);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lastPosition, setLastPosition] = useState<{ x: number; y: number } | null>(null);
+
+  const pendingTimeRef = useRef(0);
+  const pendingViewsRef = useRef(0);
+
+  // --- 基本ヘルパー・音声 ---
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+  }, []);
+
+  const speakWord = useCallback((text: string) => {
+    stopSpeaking();
+    const uttr = new SpeechSynthesisUtterance(text);
+    uttr.lang = 'ja-JP';
+    window.speechSynthesis.speak(uttr);
+  }, [stopSpeaking]);
+
+  const playSound = useCallback((type: 'correct'|'wrong'|'clear'|'chest') => {
+    const audio = new Audio(`/sounds/${type === 'chest' ? 'clear' : type}.mp3`);
+    audio.volume = 0.5;
+    audio.play().catch(()=>{});
+  }, []);
+
+  const getFullReading = useCallback((reading: string, okurigana?: string | null) => 
+    okurigana ? `${reading}${okurigana}` : reading, []);
+
+  const renderReading = useCallback((reading: string, okurigana?: string | null) => {
+    if (!okurigana) return <span>{reading}</span>;
+    return (
+      <span className="inline-flex items-baseline">
+        <span>{reading}</span>
+        <span className="text-[0.75em] font-bold ml-[1px] opacity-60">{okurigana}</span>
+      </span>
+    );
+  }, []);
+
+  const toggleReviewReveal = useCallback((id: number) => {
+    setReviewRevealed((prev) => {
+        if (prev.includes(id)) {
+            return prev.filter(rid => rid !== id);
+        }
+        return [...prev, id];
+    });
+  }, []);
+
+  // --- データ取得ロジック ---
+  const checkDailyProgress = useCallback(async () => {
+    const today = getTodayJST();
+    const yesterday = getYesterdayJST();
+    
+    const { data: todayLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
+    const { data: yesterdayLog } = await supabase.from('daily_logs').select('streak, is_completed').eq('user_id', currentUser.id).eq('date', yesterday).single();
+    
+    const yesterdayStreak = (yesterdayLog?.is_completed) ? (yesterdayLog.streak || 0) : 0;
+
+    if (todayLog) {
+        const currentStreak = todayLog.is_completed ? (todayLog.streak || (yesterdayStreak + 1)) : yesterdayStreak;
+        setDailyProgress({ ...todayLog, streak: currentStreak });
+    } else {
+        setDailyProgress({ id: 0, date: today, count: 0, is_completed: false, details: [], streak: yesterdayStreak, study_time_seconds: 0, collection_views: 0 });
+    }
+  }, [currentUser.id]);
+
+  const fetchMonthlyLogs = useCallback(async (targetDate: Date, userId: string = currentUser.id) => {
+    const y = targetDate.getFullYear();
+    const m = targetDate.getMonth();
+    const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    const last = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
+    const { data } = await supabase.from('daily_logs').select('*').eq('user_id', userId).gte('date', first).lte('date', last);
+    if (data) setMonthlyLogs(data);
+  }, [currentUser.id]);
+
+  const fetchAdminStats = useCallback(async (targetUser: any) => {
+    setLoading(true);
+    await fetchMonthlyLogs(calendarDate, targetUser.id);
+
+    const { count: totalCount } = await supabase.from('kanji_questions').select('*', { count: 'exact', head: true }).eq('target_user', targetUser.db_target);
+    const { data: progress } = await supabase.from('user_progress').select('status, mistake_count, question_id, kanji_questions(kanji, reading, okurigana)').eq('user_id', targetUser.id);
+    
+    const ranks = { learning: 0, bronze: 0, silver: 0, gold: 0 };
+    let weakList: any[] = [];
+    progress?.forEach((p: any) => {
+        const [ ...[wd] ] = [p.kanji_questions];
+        if (p.status === 'gold' || p.status === 'mastered') ranks.gold++; 
+        else if (p.status === 'silver') ranks.silver++; 
+        else if (p.status === 'bronze') ranks.bronze++;
+        if (p.mistake_count > 0 && wd) weakList.push({ word: wd.kanji, meaning: getFullReading(wd.reading, wd.okurigana), mistakes: p.mistake_count });
+    });
+    ranks.learning = Math.max(0, (totalCount || 0) - ranks.gold - ranks.silver - ranks.bronze);
+    weakList.sort((a, b) => b.mistakes - a.mistakes);
+
+    const thirtyDaysAgo = getJSTDate(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const { data: logD } = await supabase.from('daily_logs').select('*').eq('user_id', targetUser.id).gte('date', formatDate(thirtyDaysAgo)).order('date', { ascending: true });
+    
+    if (logD && logD.length > 0) {
+        const [lastLog] = logD.slice().reverse();
+        setEditStreak(lastLog?.streak || 0);
+    } else {
+        setEditStreak(0);
+    }
+
+    setStats({
+        total: totalCount || 0,
+        mastered: ranks.gold,
+        ranks,
+        weakWords: weakList,
+        checkWords: [],
+        recentLogs: logD ? logD.slice().reverse() : [],
+        graphData: logD?.map(l => ({ date: l.date.slice(5).replace('-', '/'), count: l.count || 0 })) || [],
+        pieData: [
+            { name: '未習得', value: ranks.learning },
+            { name: 'ブロンズ', value: ranks.bronze },
+            { name: 'シルバー', value: ranks.silver },
+            { name: 'ゴールド', value: ranks.gold }
+        ]
+    });
+
+    const { data: challenge } = await supabase.from('challenge_settings').select('*').eq('target_user_id', targetUser.id).single();
+    if (challenge) setChallengeSettings(challenge);
+    setLoading(false);
+  }, [calendarDate, fetchMonthlyLogs, getFullReading]);
+
+  const fetchAllWordsForEdit = useCallback(async () => {
+    const { data: words } = await supabase.from('kanji_questions').select('*').eq('target_user', adminTargetUser.db_target).order('id', { ascending: false });
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', adminTargetUser.id);
+    if (words) {
+        const sMap = new Map();
+        progress?.forEach((p: any) => sMap.set(p.question_id, p.status));
+        setAllWordsList(words.map((w: any) => ({ ...w, currentStatus: sMap.get(w.id) || 'learning' })));
+    }
+  }, [adminTargetUser.db_target, adminTargetUser.id]);
+
+  const saveChallengeSettings = useCallback(async (settings: any) => {
+    setChallengeSettings(settings);
+    const { error } = await supabase.from('challenge_settings').upsert({ target_user_id: adminTargetUser.id, ...settings, updated_at: new Date().toISOString() }, { onConflict: 'target_user_id' });
+    if (error) alert("保存に失敗しました: " + error.message);
+    else alert("設定を保存しました 🐾");
+  }, [adminTargetUser.id]);
+
+  const handleSaveStreak = useCallback(async () => {
+    const today = getTodayJST();
+    const { data: cur } = await supabase.from('daily_logs').select('*').eq('user_id', adminTargetUser.id).eq('date', today).single();
+    if (cur) await supabase.from('daily_logs').update({ streak: editStreak }).eq('id', cur.id);
+    else await supabase.from('daily_logs').insert([{ user_id: adminTargetUser.id, date: today, count: 0, is_completed: false, streak: editStreak }]);
+    alert('連続日数を修正しました');
+    fetchAdminStats(adminTargetUser);
+  }, [adminTargetUser, editStreak, fetchAdminStats]);
+
+  const handleAddWord = useCallback(async (newWordData: any) => {
+    const { error } = await supabase.from('kanji_questions').insert([{ ...newWordData, kanji_level: newWordData.category, target_user: adminTargetUser.db_target }]);
+    if (error) alert("追加に失敗しました: " + error.message);
+    else {
+      alert('単語を追加しました！');
+      fetchAllWordsForEdit();
+    }
+  }, [adminTargetUser.db_target, fetchAllWordsForEdit]);
+
+  const toggleMasterStatus = useCallback(async (id: number, currentStatus: string) => {
+    if (currentStatus === 'gold') {
+      await supabase.from('user_progress').delete().eq('user_id', adminTargetUser.id).eq('question_id', id);
+    } else {
+      await supabase.from('user_progress').upsert({ user_id: adminTargetUser.id, question_id: id, status: 'gold', last_reviewed_at: new Date().toISOString() }, { onConflict: 'user_id, question_id' });
+    }
+    fetchAllWordsForEdit();
+    fetchAdminStats(adminTargetUser);
+  }, [adminTargetUser, fetchAllWordsForEdit, fetchAdminStats]);
+
+  const handleDeleteWord = useCallback(async (id: number) => {
+    if (!confirm('本当に削除しますか？')) return;
+    const { error } = await supabase.from('kanji_questions').delete().eq('id', id);
+    if (error) alert("削除に失敗しました: " + error.message);
+    else fetchAllWordsForEdit();
+  }, [fetchAllWordsForEdit]);
+
+  const sendLineToChild = useCallback(async (msg: string) => {
+    const res = await fetch('/api/line/send', { method: 'POST', body: JSON.stringify({ message: msg }) });
+    if (res.ok) alert("LINEを送信しました！🚀");
+    else alert("送信に失敗しました");
+  }, []);
+
+  // --- ゲームロジック ---
+  const prepareQuestion = useCallback((word: KanjiWord, allWords: KanjiWord[]) => {
+    setUserAnswer(''); setMessage(''); setShowRick(false); setMistakeCount(0);
+    setFeedbackMsg(null); setIsProcessing(false); setIsTransitioning(false);
+    setShowHint(false); setShowFlashAnswer(false);
+    
+    // 手書き・自己判定用のステートとキャンバスをリセット
+    setGameStep(0);
+    if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+    
+    const nextLMode = (selectedInputMode === 'typing_read') ? 'kanji_to_read' : 'read_to_kanji';
+    setLangMode(nextLMode);
+    
+    const others = allWords.filter(w => w.id !== word.id).sort(() => 0.5 - Math.random()).slice(0, 3);
+    setOptions([word, ...others].sort(() => 0.5 - Math.random()));
+  }, [selectedInputMode]);
+
+  const startGame = async (selectedMode: any) => {
+    setLoading(true); 
+    setMode(selectedMode); 
+    setOpenedChests([]); 
+    setMistakeCount(0);
+    
+    if (selectedMode === 'daily') {
+      setSelectedInputMode('write_self');
+    }
+
+    const limit = selectedMode === 'weekend' ? (challengeSettings.special_quest_count || 10) : (challengeSettings.quest_count || 5);
+    setCurrentGameGoal(limit);
+    
+    const { data: allW } = await supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target);
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id);
+
+    if (!allW?.length) { setLoading(false); return; }
+    
+    setCachedAllWords(allW);
+
+    let queue;
+    if (selectedMode === 'daily') {
+      const statusMap = new Map(progress?.map(p => [p.question_id, p.status]));
+      const statusOrder: Record<string, number> = { gold: 0, silver: 1, bronze: 2, learning: 3 };
+
+      queue = [...allW].sort((a, b) => {
+        const rankA = statusOrder[statusMap.get(a.id) || 'learning'];
+        const rankB = statusOrder[statusMap.get(b.id) || 'learning'];
+        if (rankA !== rankB) return rankA - rankB;
+        return 0.5 - Math.random();
+      }).slice(0, limit);
+    } else {
+      queue = [...allW].sort(() => 0.5 - Math.random()).slice(0, limit);
+    }
+
+    setQuestQueue(queue); 
+    setCurrentIndex(0); 
+    
+    const [ firstWord ] = queue;
+    if (firstWord) {
+      prepareQuestion(firstWord, allW);
+    }
+    setView('game'); 
+    setLoading(false);
+  };
+
+  const updateProgress = async (id: number, correct: boolean) => {
+    const today = getTodayJST();
+    const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).single();
+    
+    const [curWord] = questQueue.slice(currentIndex);
+    const nEntry = { time: getJSTTimeString(), word: curWord?.kanji, mode: MODE_NAMES[mode], result: correct ? 'correct' : 'incorrect' };
+    
+    const nT = (cLog?.study_time_seconds || 0) + pendingTimeRef.current;
+    const nV = (cLog?.collection_views || 0) + pendingViewsRef.current;
+    pendingTimeRef.current = 0; pendingViewsRef.current = 0;
+    
+    const lD = { 
+      count: correct ? (cLog?.count || 0) + 1 : (cLog?.count || 0), 
+      is_completed: (cLog?.count || 0) >= (currentGameGoal - 1) && correct, 
+      details: [...(cLog?.details || []), nEntry], 
+      study_time_seconds: nT, 
+      collection_views: nV 
+    };
+
+    if (cLog) await supabase.from('daily_logs').update(lD).eq('id', cLog.id);
+    else await supabase.from('daily_logs').insert([{ user_id: currentUser.id, date: today, streak: 0, ...lD }]);
+    
+    setDailyProgress((prev: any) => ({ ...prev, ...lD })); 
+
+    const { data: pD } = await supabase.from('user_progress').select('status').eq('user_id', currentUser.id).eq('question_id', id).single();
+    let ns = pD?.status || 'learning'; 
+    if (correct) { 
+        if (ns === 'learning') ns = 'bronze'; 
+        else if (ns === 'bronze') ns = 'silver'; 
+        else if (ns === 'silver') ns = 'gold'; 
+    }
+    await supabase.from('user_progress').upsert({ user_id: currentUser.id, question_id: id, status: ns, last_reviewed_at: new Date().toISOString() }, { onConflict: 'user_id, question_id' });
+  };
+
+  const checkAnswer = async (ans: string, isVoice: boolean = false) => {
+    if (isProcessing || showRick) return;
+    setIsProcessing(true);
+    const [cur] = questQueue.slice(currentIndex);
+    const cor = langMode === 'read_to_kanji' ? cur.kanji : getFullReading(cur.reading, cur.okurigana);
+    
+    const normalize = (str: string) => str.replace(/[\u30a1-\u30f6]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0x60)).replace(/[\u3000\s]/g, '');
+    const isCorrect = selectedInputMode.includes('quiz') ? (ans === cor) : (normalize(ans) === normalize(cor));
+
+    if (isCorrect) {
+        playSound('correct'); setShowRick(true); confetti({ particleCount: 50 });
+        setMessage('正解！すごいワン！🎉');
+        speakWord(cur.origin_logic ? `${getFullReading(cur.reading, cur.okurigana)}。${cur.origin_logic}` : getFullReading(cur.reading, cur.okurigana));
+        await updateProgress(cur.id, true);
+    } else {
+        playSound('wrong'); 
+        const nextMs = mistakeCount + 1;
+        setMistakeCount(nextMs);
+        setShowHint(true);
+        
+        if (selectedInputMode.includes('quiz')) {
+            const wrongW = options.find(o => (langMode === 'read_to_kanji' ? o.kanji : getFullReading(o.reading, o.okurigana)) === ans);
+            if (wrongW && wrongW.id !== cur.id) {
+                setFeedbackMsg(<>❌ 選んだ「<span className="font-black text-rose-600">{ans}</span>」は「<span className="font-black text-rose-600">{langMode === 'read_to_kanji' ? getFullReading(wrongW.reading, wrongW.okurigana) : wrongW.kanji}</span>」だよ！</>);
+            }
+        }
+
+        if (nextMs >= 3) {
+            setMessage(`残念... 正解は「${cor}」`);
+            setShowRick(true);
+        } else if (nextMs === 2) {
+            setShowFlashAnswer(true);
+            setTimeout(() => setShowFlashAnswer(false), 2000);
+        }
+        await updateProgress(cur.id, false);
+    }
+    setIsProcessing(false);
+  };
+
+  const nextQuestion = useCallback(async () => {
+    setIsTransitioning(true); 
+    stopSpeaking(); 
+    
+    const nextIdx = currentIndex + 1;
+    
+    if (nextIdx >= questQueue.length) {
+        playSound('clear');
+        
+        if (mode === 'daily') {
+            const yesterday = getYesterdayJST();
+            const { data: yLog } = await supabase.from('daily_logs').select('streak').eq('user_id', currentUser.id).eq('date', yesterday).single();
+            const newStreak = (yLog?.streak || 0) + 1;
+            
+            const today = getTodayJST();
+            await supabase.from('daily_logs').update({ is_completed: true, streak: newStreak }).eq('user_id', currentUser.id).eq('date', today);
+
+            setDailyProgress((prev: any) => ({ ...prev, is_completed: true, streak: newStreak }));
+
+            const goal = challengeSettings.reward_goal_days || 14;
+            if (newStreak > 0 && newStreak % goal === 0) {
+                const newOwned = (challengeSettings.owned_rewards || 0) + 1;
+                const newTotal = (challengeSettings.total_earned_rewards || 0) + 1;
+                
+                await supabase.from('challenge_settings').update({ 
+                    owned_rewards: newOwned,
+                    total_earned_rewards: newTotal
+                }).eq('target_user_id', currentUser.id);
+                
+                setChallengeSettings((prev: any) => ({ 
+                    ...prev, 
+                    owned_rewards: newOwned, 
+                    total_earned_rewards: newTotal 
+                }));
+            }
+        }
+
+        const tSec = dailyProgress.study_time_seconds || 0;
+        const isWritingMode = ['write_canvas', 'write_self'].includes(selectedInputMode);
+        const threshold = isWritingMode ? 300 : 600; 
+        
+        let cCount = tSec >= threshold ? (1 + Math.floor((tSec - threshold) / 300)) : 0;
+        if (isWritingMode) {
+          cCount *= 2;
+        }
+        
+        const { data: tips } = await supabase.from(currentUser.defaultTipTable).select('content');
+        const allTips = tips?.map(t => t.content) || [];
+        const shuffledTips = allTips.slice().sort(() => 0.5 - Math.random());
+        
+        setRewardTipsList(shuffledTips.slice(0, Math.min(10, cCount)));
+        setView('result');
+
+    } else {
+        setCurrentIndex(nextIdx);
+        const [ nextWord ] = questQueue.slice(nextIdx);
+        if (nextWord) {
+            prepareQuestion(nextWord, cachedAllWords);
+        }
+    }
+    setIsTransitioning(false);
+  }, [currentIndex, questQueue, cachedAllWords, dailyProgress.study_time_seconds, mode, currentUser, prepareQuestion, stopSpeaking, selectedInputMode, playSound, challengeSettings]);
+
+  // --- キャンバス描画ハンドラー ---
+  const startDrawing = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    setIsDrawing(true);
+    setLastPosition({ x, y });
+  }, []);
+
+  const draw = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !lastPosition) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    ctx.beginPath();
+    ctx.moveTo(lastPosition.x, lastPosition.y);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#334155'; // 鉛筆らしい色（stone-700）
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    
+    setLastPosition({ x, y });
+  }, [isDrawing, lastPosition]);
+
+  const stopDrawing = useCallback(() => {
+    setIsDrawing(false);
+    setLastPosition(null);
+  }, []);
+
+  const clearCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  // --- 自己判定ハンドラー ---
+  const handleSelfJudge = async (isCorrect: boolean) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    const [cur] = questQueue.slice(currentIndex);
+
+    if (isCorrect) {
+        playSound('correct'); 
+        confetti({ particleCount: 50 });
+    } else {
+        playSound('wrong'); 
+        setMistakeCount(prev => prev + 1);
+    }
+
+    await updateProgress(cur.id, isCorrect);
+    nextQuestion();
+    setIsProcessing(false);
+  };
+
+  // --- カレンダー描画 ---
+  const renderCalendar = useCallback(() => {
+    const y = calendarDate.getFullYear();
+    const m = calendarDate.getMonth();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const firstDay = new Date(y, m, 1).getDay();
+    const dayCells = [];
+    const labels = ['日', '月', '火', '水', '木', '金', '土'].map(w => (
+        <div key={w} className="text-center text-[10px] font-black text-stone-400 mb-1">{w}</div>
+    ));
+
+    for (let i = 0; i < firstDay; i++) dayCells.push(<div key={`e-${i}`} className="h-9 w-9"></div>);
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const log = monthlyLogs.find(l => l.date === dateStr);
+        const isToday = dateStr === getTodayJST();
+        dayCells.push(
+            <div key={d} onClick={() => setSelectedLogDate(dateStr)} className={`h-9 w-9 flex items-center justify-center rounded-full text-xs font-bold relative cursor-pointer hover:bg-stone-100 ${isToday ? currentUser.border + ' border-2 ' + currentUser.light : 'bg-white shadow-sm'}`}>
+                <span className={isToday ? currentUser.text : 'text-stone-600'}>{d}</span>
+                {log?.is_completed && <img src="/Rick.png" alt="clear" className="absolute inset-0 w-7 h-7 object-cover rounded-full opacity-80" />}
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-stone-50 p-3 rounded-2xl border-2 border-stone-100">
+            <div className="flex justify-between items-center mb-2 px-1">
+                <button onClick={() => setCalendarDate(new Date(y, m - 1, 1))} className="text-stone-400 font-bold p-1">←</button>
+                <h3 className="font-black text-stone-600 text-sm">{y}年 {m + 1}月</h3>
+                <button onClick={() => setCalendarDate(new Date(y, m + 1, 1))} className="text-stone-400 font-bold p-1">→</button>
+            </div>
+            <div className="grid grid-cols-7 gap-1">{labels}{dayCells}</div>
+        </div>
+    );
+  }, [calendarDate, monthlyLogs, currentUser]);
+
+  // --- ライフサイクル ---
+  useEffect(() => { 
+    const init = async () => {
+      await checkDailyProgress();
+      await fetchMonthlyLogs(calendarDate);
+      
+      const { data: chal } = await supabase.from('challenge_settings').select('*').eq('target_user_id', currentUser.id).single();
+      if (chal) {
+        setHasParentChallenge(chal.mode === 'manual' ? (chal.selected_ids?.length > 0) : (chal.auto_count > 0));
+        setChallengeSettings(chal);
+      }
+
+      const { data: weakData } = await supabase
+          .from('user_progress')
+          .select('question_id, mistake_count')
+          .eq('user_id', currentUser.id)
+          .gt('mistake_count', 0)
+          .order('mistake_count', { ascending: false })
+          .limit(5);
+
+      if (weakData && weakData.length > 0) {
+          const ids = weakData.map(w => w.question_id);
+          const { data: weakWords } = await supabase.from('kanji_questions').select('*').in('id', ids);
+          
+          if (weakWords) {
+              const sortedWeak = ids.map(id => weakWords.find(w => w.id === id)).filter(Boolean) as KanjiWord[];
+              setReviewCandidates(sortedWeak);
+          }
+      } else {
+          setReviewCandidates([]);
+      }
+    };
+    init();
+  }, [currentUser.id, calendarDate, view, fetchMonthlyLogs, checkDailyProgress]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (['game', 'collection', 'rick_challenge'].includes(view)) {
+      interval = setInterval(() => { pendingTimeRef.current += 1; }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [view]);
+
+  const navTo = (v: any) => { stopSpeaking(); setShowRick(false); setView(v); };
+
+  // --- メインレンダリング ---
+  if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading}} />;
+  
+  if (view === 'admin') return <AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />;
+  
+  if (view === 'collection') return <CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }}} />;
+  
+  if (view === 'game' || view === 'rick_challenge') return (
+    <GameScreen 
+      {...{
+        currentUser, view, mode, questQueue, currentIndex, isTransitioning, 
+        selectedInputMode, rickMode, inputMode: selectedInputMode.includes('quiz') ? 'quiz' : 'typing', 
+        langMode, gameStep, setGameStep, weekendPhase: 1, bossHp, currentGameGoal, 
+        isBossAttacked: false, showRick, message, showHint, showFlashAnswer, mistakeCount, 
+        feedbackMsg, options, userAnswer, setUserAnswer, isListening, isDrawing, 
+        canvasRef, startDrawing, draw, stopDrawing, clearCanvas, 
+        startListening: () => setIsListening(!isListening), checkAnswer, 
+        handleSelfJudge, 
+        nextQuestion, stopSpeaking, setView: navTo, renderReading, speakWord, getFullReading
+      }} 
+    />
+  );
+
+  if (view === 'result') {
+    const isRRoom = rewardTipsList.length > 0;
+    const tS = dailyProgress.study_time_seconds || 0;
+    const isWritingMode = ['write_canvas', 'write_self'].includes(selectedInputMode);
+    const threshold = isWritingMode ? 300 : 600;
+    const progP = Math.min(100, (tS / threshold) * 100);
+    const remainingMin = Math.ceil(Math.max(0, threshold - tS) / 60);
+
+    return (
+        <div className={`min-h-screen ${isRRoom ? 'bg-slate-950' : currentUser.light} flex flex-col items-center justify-center p-6 text-center font-sans transition-colors duration-1000`}>
+            {isRRoom ? (
+                <div className="w-full max-w-lg animate-in fade-in zoom-in duration-700">
+                    <div className="mb-8 text-left">
+                        <h2 className="text-4xl font-black text-yellow-400 mb-2">✨ 秘密の宝物庫 ✨</h2>
+                        <p className="text-sky-300 font-bold text-sm tracking-widest">宝箱をタップして豆知識を手にいれよう！</p>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-5 mb-10">
+                        {rewardTipsList.map((tip, idx) => {
+                            const isOpened = openedChests.includes(idx);
+                            return (
+                                <div key={idx} onClick={async () => {
+                                    if(!isOpened) {
+                                        playSound('chest'); setOpenedChests([...openedChests, idx]); confetti({ particleCount: 30 });
+                                        const currentTips = challengeSettings?.unlocked_tips || [];
+                                        if (!currentTips.includes(tip)) {
+                                            const nextTips = [...currentTips, tip];
+                                            setChallengeSettings((p:any) => ({...p, unlocked_tips: nextTips}));
+                                            await supabase.from('challenge_settings').update({ unlocked_tips: nextTips }).eq('target_user_id', currentUser.id);
+                                        }
+                                    }
+                                }} className={`relative p-5 rounded-[2.5rem] border-2 transition-all duration-500 cursor-pointer transform active:scale-90 ${isOpened ? 'bg-slate-900/50 border-slate-800 scale-95 shadow-inner' : 'bg-gradient-to-b from-slate-800 to-slate-900 border-yellow-500/50 shadow-lg'}`}>
+                                    {!isOpened && <div className="absolute inset-0 bg-yellow-400/5 rounded-[2.5rem] animate-pulse"></div>}
+                                    <div className={`text-6xl mb-3 ${isOpened ? 'rotate-12 scale-110' : ''}`}>{isOpened ? '🎁' : '📦'}</div>
+                                    <p className={`text-[11px] font-black transition-colors ${isOpened ? 'text-sky-200' : 'text-yellow-600'}`}>{isOpened ? tip : '開ける！'}</p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            ) : (
+                <div className="bg-white rounded-[3.5rem] shadow-2xl p-10 w-full max-w-sm border-4 border-stone-100">
+                    <h2 className="text-4xl font-black text-emerald-500 mb-6">QUEST CLEAR!</h2>
+                    <div className="relative w-32 h-32 mx-auto mb-8">
+                        <img src="/Rick.png" alt="Rick" className="w-full h-full rounded-full shadow-lg border-4 border-white object-cover" />
+                    </div>
+                    <div className="bg-stone-50 p-6 rounded-3xl mb-8 text-left border-2 border-stone-100">
+                        <p className="text-sm font-black text-stone-700 leading-tight mb-4">あと <span className="text-2xl text-orange-500 mx-0.5">{remainingMin}</span> 分 の学習で<br/>お宝へのトビラが開くワン！🐾</p>
+                        <div className="w-full bg-stone-200 rounded-full h-4 shadow-inner p-1"><div className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full rounded-full transition-all" style={{ width: `${progP}%` }}></div></div>
+                    </div>
+                </div>
+            )}
+            <button onClick={() => setView('menu')} className={`mt-8 w-full max-w-sm py-5 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 border-b-8 ${isRRoom ? 'bg-slate-800 text-white' : 'bg-stone-800 text-white'}`}>村へもどる 🐾</button>
+        </div>
+    );
+  }
+  return null;
+}
+</file>
+
+</files>

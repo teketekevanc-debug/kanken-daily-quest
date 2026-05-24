@@ -2,7 +2,6 @@
 import React, { useState } from 'react'
 import { USERS, CATEGORIES, MODE_NAMES, getUserFirstName, getDailyMessage } from '@/lib/constants'
 
-// Homeコンポーネントから受け取るデータと関数の「型」を定義
 type MenuScreenProps = {
   currentUser: any;
   setCurrentUser: (user: any) => void;
@@ -29,7 +28,6 @@ type MenuScreenProps = {
 }
 
 export default function MenuScreen(props: MenuScreenProps) {
-  // プロパティを分割代入で受け取り
   const { 
     currentUser, setCurrentUser, dailyProgress, challengeSettings, 
     targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode,
@@ -38,10 +36,8 @@ export default function MenuScreen(props: MenuScreenProps) {
     stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading
   } = props;
 
-  // ★ 豆知識ノート表示用のState
   const [showTipsModal, setShowTipsModal] = useState(false);
 
-  // 変数展開（分割代入の徹底）
   const streakData = [dailyProgress?.streak || 0];
   const [streak] = streakData;
 
@@ -54,7 +50,6 @@ export default function MenuScreen(props: MenuScreenProps) {
   const tipsData = [challengeSettings?.unlocked_tips || []];
   const [unlockedTips] = tipsData;
   
-  // 次のご褒美メッセージの計算
   const remainder = streak % goal;
   const daysUntil = (remainder === 0 && streak > 0) ? goal : goal - remainder;
   const nextRewardMsg = (remainder === 0 && streak > 0) 
@@ -71,7 +66,6 @@ export default function MenuScreen(props: MenuScreenProps) {
   return (
     <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans transition-colors duration-500`}>
       
-      {/* ユーザー切り替え */}
       <div className="absolute top-4 right-4 flex flex-wrap justify-end gap-2 max-w-[70%]">
         {USERS.map((u: any) => (
           <button key={u.id} onClick={() => setCurrentUser(u)} className={`px-3 py-1.5 rounded-full text-xs font-black transition-all shadow-sm ${currentUser.id === u.id ? `bg-gradient-to-r ${u.hue} text-white scale-110 ring-2 ring-white/50` : 'bg-white/50 text-stone-500 opacity-90 hover:bg-white'}`}>
@@ -80,14 +74,12 @@ export default function MenuScreen(props: MenuScreenProps) {
         ))}
       </div>
 
-      {/* ナビゲーターRick */}
       <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-xl mb-4 relative mt-4">
         <img src="/Rick.png" alt="Rick" className="w-full h-full object-cover" />
         <div className="absolute bottom-0 left-0 right-0 bg-stone-900/40 text-white text-[10px] text-center font-bold py-0.5 backdrop-blur-sm tracking-widest">ナビゲーター</div>
       </div>
       <h1 className={`text-3xl font-black ${currentUser.text} mb-2 tracking-widest drop-shadow-sm`}>毎日漢検クエスト</h1>
       
-      {/* 設定エリア */}
       <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">
           <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🎯</span> 出題するカテゴリ</p>
           <select value={targetKyu} onChange={e => setTargetKyu(e.target.value)} className="w-full p-3 border-2 border-stone-200 rounded-xl text-sm font-black text-stone-700 bg-stone-50 outline-none focus:border-sky-400 mb-5 text-center shadow-inner">
@@ -97,7 +89,21 @@ export default function MenuScreen(props: MenuScreenProps) {
 
           <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🕹️</span> 回答モード</p>
           <div className="grid grid-cols-2 gap-2 mb-2">
-            <button onClick={() => setSelectedInputMode('quiz_kanji')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'quiz_kanji' ? `bg-orange-500 text-white border-orange-600 shadow-md` : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>🔘 4択で選ぶ</button>
+            {/* ★ ここが特訓用の封印ボタン */}
+            <button 
+              onClick={() => setSelectedInputMode('quiz_kanji')} 
+              disabled={currentUser.id === 'brother'}
+              className={`py-3 rounded-xl font-black transition-all border-b-4 flex flex-col items-center justify-center gap-1 ${
+                currentUser.id === 'brother'
+                  ? 'bg-stone-200 text-stone-400 cursor-not-allowed opacity-60 border-stone-300'
+                  : selectedInputMode === 'quiz_kanji' 
+                    ? 'bg-orange-500 text-white border-orange-600 shadow-md active:translate-y-1 active:border-b-0' 
+                    : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50 active:translate-y-1 active:border-b-0'
+              }`}
+            >
+              <span className="text-xs">🔘 4択で選ぶ</span>
+              {currentUser.id === 'brother' && <span className="text-[9px] text-rose-500 tracking-tighter">※特訓中につき封印！</span>}
+            </button>
             <button onClick={() => setSelectedInputMode('typing_read')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'typing_read' ? 'bg-indigo-500 text-white border-indigo-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>⌨️ 読み入力</button>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -106,7 +112,6 @@ export default function MenuScreen(props: MenuScreenProps) {
           </div>
       </div>
       
-      {/* 👑 ご褒美・連続記録エリア */}
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-5 mb-5 border-b-4 border-stone-200 relative overflow-hidden">
           <div className="absolute -right-4 -top-4 text-6xl opacity-10">🔥</div>
           <p className="text-xs font-black text-sky-600 mb-2 animate-pulse">{getDailyMessage(currentUser.id)}</p>
@@ -126,38 +131,35 @@ export default function MenuScreen(props: MenuScreenProps) {
             {nextRewardMsg}
           </div>
 
-          {/* ご褒美ルールの説明（折りたたみ） */}
-<div className="mt-3 border-t border-stone-100 pt-3">
-  <details className="group">
-    <summary className="list-none cursor-pointer">
-      <div className="text-[10px] font-black text-stone-400 flex items-center justify-center gap-1 group-open:text-sky-500 transition-colors">
-        <span>📜</span> ご褒美をもらうためのヒント {/* ぼかした表現 */}
-        <span className="transition-transform group-open:rotate-180">▼</span>
-      </div>
-    </summary>
-    <div className="mt-2 bg-stone-50 p-3 rounded-xl text-[11px] font-bold text-stone-600 leading-relaxed text-left animate-in fade-in slide-in-from-top-1">
-      <p>・しっかり集中して、漢字の世界を冒険しよう！</p>
-      <p>・10分くらい、問題を解いたり図鑑をながめていると、クリアしたあとに宝箱が出るかも...？</p>
-      <p>・「手書き」や「自己判定」で頑張ると、いいことがあるかも！？</p>
-      <p className="text-[9px] text-stone-400 mt-2">※ 途中で画面を閉じると、時間はリセットされるから注意してね！</p>
-    </div>
-  </details>
-</div>
+          <div className="mt-3 border-t border-stone-100 pt-3">
+            <details className="group">
+              <summary className="list-none cursor-pointer">
+                <div className="text-[10px] font-black text-stone-400 flex items-center justify-center gap-1 group-open:text-sky-500 transition-colors">
+                  <span>📜</span> ご褒美をもらうためのヒント 
+                  <span className="transition-transform group-open:rotate-180">▼</span>
+                </div>
+              </summary>
+              <div className="mt-2 bg-stone-50 p-3 rounded-xl text-[11px] font-bold text-stone-600 leading-relaxed text-left animate-in fade-in slide-in-from-top-1">
+                <p>・しっかり集中して、漢字の世界を冒険しよう！</p>
+                <p>・10分くらい、問題を解いたり図鑑をながめていると、クリアしたあとに宝箱が出るかも...？</p>
+                <p>・「手書き」や「自己判定」で頑張ると、いいことがあるかも！？</p>
+                <p className="text-[9px] text-stone-400 mt-2">※ 途中で画面を閉じると、時間はリセットされるから注意してね！</p>
+              </div>
+            </details>
+          </div>
 
-          {/* ★ 豆知識ノートへの入り口 */}
           <button 
-  onClick={() => setShowTipsModal(true)} 
-  className="w-full bg-gradient-to-b from-amber-700 to-amber-900 text-amber-100 font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center gap-3 shadow-[0_5px_0_0_rgba(69,26,3,1)] hover:brightness-110 mb-2"
->
-  <span className="text-2xl">🎁</span>
-  <div className="text-left leading-tight">
-    <p className="text-[10px] text-amber-300/80">あつめたお宝</p>
-    <p className="text-sm tracking-widest">豆知識コレクション ({unlockedTips.length})</p>
-  </div>
-</button>
+            onClick={() => setShowTipsModal(true)} 
+            className="w-full bg-gradient-to-b from-amber-700 to-amber-900 text-amber-100 font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center gap-3 shadow-[0_5px_0_0_rgba(69,26,3,1)] hover:brightness-110 mb-2 mt-4"
+          >
+            <span className="text-2xl">🎁</span>
+            <div className="text-left leading-tight">
+              <p className="text-[10px] text-amber-300/80">あつめたお宝</p>
+              <p className="text-sm tracking-widest">豆知識コレクション ({unlockedTips.length})</p>
+            </div>
+          </button>
       </div>
 
-      {/* 復習カード */}
       {reviewCandidates.length > 0 && (
         <div className="w-full max-w-sm mb-6 animate-in slide-in-from-top duration-500">
           <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 shadow-sm relative overflow-hidden">
@@ -181,14 +183,12 @@ export default function MenuScreen(props: MenuScreenProps) {
         </div>
       )}
 
-      {/* 今日の進捗バー */}
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-6 mb-6 relative border-2 border-stone-50">
         <div className="flex items-center justify-between mb-3"><span className="text-stone-500 font-bold text-sm">📅 今日の進捗</span><span className={`text-2xl font-black ${currentUser.text}`}>{dailyProgress?.count || 0} <span className="text-base text-stone-400">/ {displayCount} 問</span></span></div>
         <div className="w-full bg-stone-100 rounded-full h-5 shadow-inner p-0.5"><div className={`h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${currentUser.hue}`} style={{ width: `${Math.min(((dailyProgress?.count || 0) / displayCount) * 100, 100)}%` }}></div></div>
         {dailyProgress?.is_completed ? <p className="text-center text-orange-500 font-bold mt-3 animate-bounce">💮 今日のノルマ達成！えらい！</p> : <p className="text-center text-stone-400 text-xs mt-3 font-bold">目標まであと {Math.max(0, displayCount - (dailyProgress?.count || 0))} 問！</p>}
       </div>
       
-      {/* メインアクションボタン */}
       <div className="space-y-3 w-full max-w-sm mb-6">
         {hasParentChallenge && (
           <button onClick={() => { if (!isParentDone) startGame('parent_challenge'); }} className={`w-full py-4 px-6 rounded-2xl font-black shadow-lg transform transition-all flex items-center justify-between ${isParentDone ? 'bg-stone-200 text-white shadow-none' : 'bg-gradient-to-r from-rose-500 to-orange-500 text-white animate-pulse active:scale-95'}`}>
@@ -202,7 +202,6 @@ export default function MenuScreen(props: MenuScreenProps) {
           {dailyProgress?.is_completed ? <span className="bg-white/30 px-3 py-1 rounded-full text-xs">クリア済</span> : <span className="bg-white/30 px-3 py-1 rounded-full text-sm">{displayCount}問</span>}
         </button>
         
-        {/* Rickの特訓 */}
         <div className={`w-full p-4 rounded-2xl shadow-md border-2 transition-all ${isRickDone ? 'bg-stone-100 border-stone-200' : 'bg-white border-stone-100'}`}>
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2"><span className="text-xl">⚡</span> <span className={`font-bold ${isRickDone ? 'text-stone-400' : 'text-stone-700'}`}>Rickの特訓</span></div>
@@ -229,10 +228,8 @@ export default function MenuScreen(props: MenuScreenProps) {
         </div>
       </div>
 
-      {/* カレンダー */}
       <div className="mb-6 w-full max-w-sm">{renderCalendar()}</div>
 
-      {/* パパ・ママからのお返事 */}
       {dailyProgress?.parent_reply && (
         <div className="mb-8 w-full max-w-sm bg-white border-4 border-orange-200 rounded-3xl p-6 shadow-lg relative">
           <div className="absolute -top-4 left-6 bg-orange-400 text-white text-xs font-black tracking-widest px-4 py-1.5 rounded-full shadow-sm">パパ・ママからのお返事</div>
@@ -240,20 +237,15 @@ export default function MenuScreen(props: MenuScreenProps) {
         </div>
       )}
 
-    
-{/* 保護者（kenta, mami）のみに表示される入り口 */}
-{(currentUser.id === 'kenta' || currentUser.id === 'mami') && (
-  <button 
-    onClick={() => { stopSpeaking(); fetchAdminStats(currentUser); setAdminTargetUser(currentUser); setView('admin'); }} 
-    className="mb-8 bg-stone-800 hover:bg-stone-900 text-white font-black py-4 px-8 rounded-2xl w-full max-w-xs shadow-xl text-sm transition-all active:scale-95 border-b-4 border-stone-950 flex items-center justify-center gap-2"
-  >
-    <span>👨‍👩‍👧‍👦</span> 保護者管理メニュー
-  </button>
-)}
+      {(currentUser.id === 'kenta' || currentUser.id === 'mami') && (
+        <button 
+          onClick={() => { stopSpeaking(); fetchAdminStats(currentUser); setAdminTargetUser(currentUser); setView('admin'); }} 
+          className="mb-8 bg-stone-800 hover:bg-stone-900 text-white font-black py-4 px-8 rounded-2xl w-full max-w-xs shadow-xl text-sm transition-all active:scale-95 border-b-4 border-stone-950 flex items-center justify-center gap-2"
+        >
+          <span>👨‍👩‍👧‍👦</span> 保護者管理メニュー
+        </button>
+      )}
 
-      {/* ==========================================
-          ★ 豆知識ノート（モーダル画面）
-      ========================================== */}
       {showTipsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in" onClick={() => setShowTipsModal(false)}>
           <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>

@@ -6,7 +6,7 @@ type CollectionScreenProps = {
     currentUser: any;
     setView: (view: string) => void;
     allWordsList: any[];
-    challengeSettings: any; // ★ 追加：豆知識（unlocked_tips）が入っている
+    challengeSettings: any;
     speakWord: (text: string) => void;
     renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
     getFullReading: (reading: string, okurigana?: string | null) => string;
@@ -20,18 +20,18 @@ export default function CollectionScreen(props: CollectionScreenProps) {
         speakWord, renderReading, getFullReading, stopSpeaking, onViewCard 
     } = props;
     
-    // 表示モード切り替え ('words' | 'tips')
     const [mainTab, setMainTab] = useState<'words'|'tips'>('words');
-    // 級の選択状態（null の時はリストを表示）
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [flashcardMode, setFlashcardMode] = useState<'normal'|'hide_kanji'|'hide_reading'>('normal');
+    
+    // グリッドでのクイズ表示用に保持
     const [revealedCards, setRevealedCards] = useState<number[]>([]);
+    // ★ フラッシュカードの現在地インデックス
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-    // 豆知識（宝箱から出たヒント）
     const unlockedTips = challengeSettings?.unlocked_tips || [];
 
-    // 各級の進捗計算（リスト表示用）
     const categoryStats = useMemo(() => {
         return CATEGORIES.map(cat => {
             const words = allWordsList.filter(w => w.kanji_level === cat.id);
@@ -41,7 +41,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
         });
     }, [allWordsList]);
 
-    // フィルタリングされた単語
     const filteredWords = useMemo(() => {
         return allWordsList.filter(w => {
             if (w.kanji_level !== selectedCategory) return false;
@@ -50,22 +49,19 @@ export default function CollectionScreen(props: CollectionScreenProps) {
         });
     }, [allWordsList, selectedCategory, searchQuery]);
 
-    const toggleCardReveal = (w: any) => { 
-        if (revealedCards.includes(w.id)) {
-            setRevealedCards(revealedCards.filter(rid => rid !== w.id)); 
-            stopSpeaking();
-        } else {
-            if (onViewCard) onViewCard();
+    // グリッドのタップ時の挙動（クイズ表示を解除 ＆ フラッシュカードを開く）
+    const handleCardClick = (w: any, index: number) => { 
+        if (!revealedCards.includes(w.id)) {
             setRevealedCards([...revealedCards, w.id]);
-            // ★ 自動読み上げは停止（ユーザーの指示によりボタン式へ）
         }
+        if (onViewCard) onViewCard();
+        setSelectedIndex(index);
     };
 
     return (
         <div className={`min-h-screen ${currentUser.light} p-4 font-sans pb-24`}>
           <div className="max-w-2xl mx-auto">
             
-            {/* ヘッダー */}
             <div className="flex justify-between items-center mb-6">
               <button 
                 onClick={() => { 
@@ -81,7 +77,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
               </h2>
             </div>
 
-            {/* メインタブ切り替え (図鑑 or 豆知識) */}
             <div className="flex p-1 bg-stone-200/50 rounded-2xl mb-6">
                 <button 
                     onClick={() => setMainTab('words')} 
@@ -97,12 +92,8 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                 </button>
             </div>
 
-            {/* ==========================================
-                漢字図鑑モード
-               ========================================== */}
             {mainTab === 'words' && (
               <>
-                {/* 級の選択リスト (タスク 3-2: リスト形式) */}
                 {!selectedCategory ? (
                     <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4">
                         {categoryStats.map(cat => (
@@ -128,7 +119,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                         ))}
                     </div>
                 ) : (
-                    /* 単語グリッド表示 */
                     <div className="animate-in fade-in zoom-in-95 duration-300">
                         <div className="bg-white rounded-3xl p-5 shadow-md border-2 border-stone-100 mb-6">
                           <input 
@@ -146,8 +136,8 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                         </div>
 
                         <div className="grid grid-cols-3 gap-3">
-                          {filteredWords.map((w) => (
-                            <div key={w.id} onClick={() => toggleCardReveal(w)} className="bg-white rounded-[2rem] p-3 border-b-4 border-stone-200 shadow-sm flex flex-col items-center justify-center relative aspect-square cursor-pointer active:scale-95 transition-transform overflow-hidden">
+                          {filteredWords.map((w, index) => (
+                            <div key={w.id} onClick={() => handleCardClick(w, index)} className="bg-white rounded-[2rem] p-3 border-b-4 border-stone-200 shadow-sm flex flex-col items-center justify-center relative aspect-square cursor-pointer active:scale-95 transition-transform overflow-hidden">
                               <div className="text-2xl mb-1">{w.emoji}</div>
                               <div className="relative w-full text-center">
                                 <span className="text-3xl font-black text-stone-800 leading-none block truncate">{w.kanji}</span>
@@ -170,19 +160,14 @@ export default function CollectionScreen(props: CollectionScreenProps) {
               </>
             )}
 
-            {/* ==========================================
-                豆知識モード (タスク 2-2: 宝箱UI)
-               ========================================== */}
             {mainTab === 'tips' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                     {unlockedTips.length > 0 ? (
                         <div className="grid grid-cols-1 gap-6">
                             {unlockedTips.map((tip: string, i: number) => (
                                 <div key={i} className="relative group">
-                                    {/* 巻物（羊皮紙）風の背景 */}
                                     <div className="absolute -inset-1 bg-amber-200/30 rounded-[2rem] blur-sm"></div>
                                     <div className="relative bg-[#fdf6e3] p-8 rounded-[1.5rem] shadow-xl border-x-[12px] border-amber-900/10 overflow-hidden">
-                                        {/* 飾り */}
                                         <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-amber-800/20 rounded-tl-3xl"></div>
                                         <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-amber-800/20 rounded-br-3xl"></div>
                                         
@@ -208,54 +193,67 @@ export default function CollectionScreen(props: CollectionScreenProps) {
           </div>
 
           {/* ==========================================
-              詳細カード (タスク 3-1: 読み上げ制限)
+              ★ タスク 3: 巨大フラッシュカード化
              ========================================== */}
-          {revealedCards.length > 0 && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/90 backdrop-blur-md animate-in fade-in" onClick={() => setRevealedCards([])}>
-              {allWordsList.filter(x => revealedCards.includes(x.id)).map(sw => (
-                <div key={sw.id} className="bg-white w-full max-w-sm rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in duration-300 flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
-                  
-                  <div className="p-10 text-center bg-stone-50 border-b-2 border-stone-100 shrink-0 relative">
-                    {sw.currentStatus === 'gold' && <div className="absolute top-6 right-8 text-4xl">👑</div>}
-                    <div className="text-6xl mb-4">{sw.emoji}</div>
-                    <h2 className="text-8xl font-black text-stone-800 mb-4">{sw.kanji}</h2>
-                    
-                    {/* ★ タスク 3-1: 読み上げボタン */}
-                    <div className="flex items-center justify-center gap-3">
-                        <div className="text-3xl font-black text-sky-600 bg-sky-50 px-8 py-3 rounded-full border-2 border-sky-100 shadow-inner">
-                            {renderReading(sw.reading, sw.okurigana)}
-                        </div>
-                        <button 
-                            onClick={() => speakWord(getFullReading(sw.reading, sw.okurigana))}
-                            className="w-14 h-14 bg-sky-500 text-white rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform hover:bg-sky-400"
-                        >
-                            <span className="text-2xl">🔊</span>
-                        </button>
+          {selectedIndex !== null && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/90 backdrop-blur-md animate-in fade-in" onClick={() => setSelectedIndex(null)}>
+              <div className="bg-white w-full max-w-2xl min-h-[400px] rounded-[3rem] p-8 relative flex flex-col items-center justify-center shadow-2xl animate-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
+                
+                <button onClick={() => setSelectedIndex(null)} className="absolute top-6 right-6 text-stone-400 hover:text-stone-600 text-3xl font-black">✖</button>
+                
+                <div className="flex items-center justify-between w-full mt-4">
+                  {/* ◀ 前へ */}
+                  <button 
+                    onClick={() => setSelectedIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
+                    disabled={selectedIndex === 0}
+                    className={`text-6xl transition-all p-4 ${selectedIndex === 0 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
+                  >◀</button>
+
+                  {/* 巨大な漢字と読み表示 */}
+                  <div className="text-center px-4 flex flex-col items-center animate-in zoom-in duration-300" key={selectedIndex}>
+                    <div className="text-6xl mb-4">{filteredWords[selectedIndex].emoji}</div>
+                    <h2 className="text-[8rem] sm:text-[10rem] font-black text-stone-800 leading-none mb-6 drop-shadow-md">
+                      {filteredWords[selectedIndex].kanji}
+                    </h2>
+                    <div className="flex items-center gap-4 bg-sky-50 py-3 px-8 rounded-full border-4 border-sky-100 shadow-sm">
+                      <p className="text-4xl sm:text-5xl font-black text-sky-700">
+                        {renderReading(filteredWords[selectedIndex].reading, filteredWords[selectedIndex].okurigana)}
+                      </p>
+                      <button 
+                        onClick={() => speakWord(getFullReading(filteredWords[selectedIndex].reading, filteredWords[selectedIndex].okurigana))} 
+                        className="bg-white text-sky-500 p-3 rounded-full shadow-md active:scale-90 transition-transform"
+                      >
+                        <span className="text-2xl">🔊</span>
+                      </button>
                     </div>
-                  </div>
-                  
-                  <div className="p-8 space-y-5 overflow-y-auto no-scrollbar bg-white flex-1">
-                    {sw.usage_example && (
-                      <div className="bg-emerald-50/50 p-5 rounded-[2rem] border-2 border-emerald-100/50 text-left">
-                        <span className="text-xs font-black text-emerald-500 block mb-2">💡 例文でチェック</span>
-                        <p className="text-lg font-bold text-stone-700 leading-relaxed">「{sw.usage_example}」</p>
-                      </div>
+                    
+                    {filteredWords[selectedIndex].usage_example && (
+                      <p className="mt-6 text-xl font-bold text-stone-600">
+                        「{filteredWords[selectedIndex].usage_example.replace('□', '〇')}」
+                      </p>
                     )}
-                    {sw.origin_logic && (
-                      <div className="bg-amber-50/50 p-5 rounded-[2rem] border-2 border-amber-100/50 text-left">
-                        <span className="text-xs font-black text-amber-500 block mb-2">📜 なりたち</span>
-                        <p className="text-lg font-bold text-amber-900/80 leading-relaxed">{sw.origin_logic}</p>
-                      </div>
+                    {filteredWords[selectedIndex].origin_logic && (
+                       <div className="mt-4 bg-amber-50 p-4 rounded-2xl border-2 border-amber-100">
+                         <span className="text-sm font-black text-amber-500 block mb-1">📜 なりたち</span>
+                         <p className="text-lg font-bold text-amber-900/80">{filteredWords[selectedIndex].origin_logic}</p>
+                       </div>
                     )}
                   </div>
-  
-                  <div className="p-6 bg-stone-50 shrink-0">
-                    <button onClick={() => setRevealedCards([])} className="w-full py-5 bg-stone-800 text-white rounded-[1.5rem] font-black text-xl shadow-xl active:scale-95 transition">ずかんを閉じる 🐾</button>
-                  </div>
+
+                  {/* 次へ ▶ */}
+                  <button 
+                    onClick={() => setSelectedIndex(prev => (prev !== null && prev < filteredWords.length - 1 ? prev + 1 : prev))}
+                    disabled={selectedIndex === filteredWords.length - 1}
+                    className={`text-6xl transition-all p-4 ${selectedIndex === filteredWords.length - 1 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
+                  >▶</button>
                 </div>
-              ))}
+                
+                <p className="absolute bottom-6 text-stone-400 font-bold tracking-widest">
+                  {selectedIndex + 1} / {filteredWords.length}
+                </p>
+              </div>
             </div>
           )}
         </div>
-      );
+    );
 }

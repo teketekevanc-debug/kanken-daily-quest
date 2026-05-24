@@ -87,6 +87,8 @@ export const USERS = [
 ];
 
 export const CATEGORIES = [
+  { id: 'exam_kyu6', name: '🔥漢検6級 過去問対策' },
+  { id: 'exam_kyu5', name: '🔥漢検5級 過去問対策' },
   { id: 'kyu10', name: '10級 (小1)' },
   { id: 'kyu9', name: '9級 (小2)' },
   { id: 'kyu8', name: '8級 (小3)' },

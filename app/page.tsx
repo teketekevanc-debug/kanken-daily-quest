@@ -45,7 +45,7 @@ export default function Home() {
   const [challengeSettings, setChallengeSettings] = useState<any>({ mode: 'auto', selected_ids: [], auto_count: 5, quest_count: 5, special_quest_count: 10, challenge_quest_count: 8, reward_goal_days: 14, reward_text: '好きなおやつ', owned_rewards: 0, total_earned_rewards: 0, unlocked_tips: [] })
   const [hasParentChallenge, setHasParentChallenge] = useState(false); 
   const [calendarDate, setCalendarDate] = useState<Date>(getJSTDate())
-  const [dailyProgress, setDailyProgress] = useState<any>({ id: 0, date: getTodayJST(), count: 0, is_completed: false, study_time_seconds: 0, collection_views: 0 })
+  const [dailyProgress, setDailyProgress] = useState<any>({ id: 0, date: getTodayJST(), count: 0, is_completed: false, study_time_seconds: 0, collection_views: 0, streak: 0 })
   const [monthlyLogs, setMonthlyLogs] = useState<any[]>([]); 
   const [stats, setStats] = useState<ProgressStats | null>(null)
   
@@ -74,7 +74,12 @@ export default function Home() {
   const [rewardTipsList, setRewardTipsList] = useState<string[]>([]);
   const [openedChests, setOpenedChests] = useState<number[]>([]);
 
+  // --- キャンバス・自己判定用ステート ---
   const canvasRef = useRef<HTMLCanvasElement>(null!);
+  const [gameStep, setGameStep] = useState(0);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [lastPosition, setLastPosition] = useState<{ x: number; y: number } | null>(null);
+
   const pendingTimeRef = useRef(0);
   const pendingViewsRef = useRef(0);
 
@@ -109,12 +114,10 @@ export default function Home() {
     );
   }, []);
 
-  // カードの表裏を切り替える関数
   const toggleReviewReveal = useCallback((id: number) => {
     setReviewRevealed((prev) => {
         if (prev.includes(id)) {
-            const [ ...rest ] = prev.filter(rid => rid !== id);
-            return rest;
+            return prev.filter(rid => rid !== id);
         }
         return [...prev, id];
     });
@@ -124,20 +127,20 @@ export default function Home() {
   const checkDailyProgress = useCallback(async () => {
     const today = getTodayJST();
     const yesterday = getYesterdayJST();
-    const { data } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
     
-    // 前日のストリークを取得
-    const { data: yLog } = await supabase.from('daily_logs').select('streak, is_completed').eq('user_id', currentUser.id).eq('date', yesterday).single();
-    const yesterdayStreak = (yLog?.is_completed) ? (yLog.streak || 0) : 0;
+    const { data: todayLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
+    const { data: yesterdayLog } = await supabase.from('daily_logs').select('streak, is_completed').eq('user_id', currentUser.id).eq('date', yesterday).single();
+    
+    const yesterdayStreak = (yesterdayLog?.is_completed) ? (yesterdayLog.streak || 0) : 0;
 
-    if (data) {
-        setDailyProgress({ ...data, streak: yesterdayStreak });
+    if (todayLog) {
+        const currentStreak = todayLog.is_completed ? (todayLog.streak || (yesterdayStreak + 1)) : yesterdayStreak;
+        setDailyProgress({ ...todayLog, streak: currentStreak });
     } else {
         setDailyProgress({ id: 0, date: today, count: 0, is_completed: false, details: [], streak: yesterdayStreak, study_time_seconds: 0, collection_views: 0 });
     }
   }, [currentUser.id]);
 
-  // ★ カレンダー用ログ取得（userId引数を追加し、連動を可能にする）
   const fetchMonthlyLogs = useCallback(async (targetDate: Date, userId: string = currentUser.id) => {
     const y = targetDate.getFullYear();
     const m = targetDate.getMonth();
@@ -147,21 +150,17 @@ export default function Home() {
     if (data) setMonthlyLogs(data);
   }, [currentUser.id]);
 
-  // ★ 管理者統計取得（カレンダー連動を統合）
   const fetchAdminStats = useCallback(async (targetUser: any) => {
     setLoading(true);
-    
-    // 1. カレンダーのログを子供のものに切り替える
     await fetchMonthlyLogs(calendarDate, targetUser.id);
 
-    // 2. 漢字習得状況の取得
     const { count: totalCount } = await supabase.from('kanji_questions').select('*', { count: 'exact', head: true }).eq('target_user', targetUser.db_target);
     const { data: progress } = await supabase.from('user_progress').select('status, mistake_count, question_id, kanji_questions(kanji, reading, okurigana)').eq('user_id', targetUser.id);
     
     const ranks = { learning: 0, bronze: 0, silver: 0, gold: 0 };
     let weakList: any[] = [];
     progress?.forEach((p: any) => {
-        const wd = p.kanji_questions;
+        const [ ...[wd] ] = [p.kanji_questions];
         if (p.status === 'gold' || p.status === 'mastered') ranks.gold++; 
         else if (p.status === 'silver') ranks.silver++; 
         else if (p.status === 'bronze') ranks.bronze++;
@@ -170,14 +169,11 @@ export default function Home() {
     ranks.learning = Math.max(0, (totalCount || 0) - ranks.gold - ranks.silver - ranks.bronze);
     weakList.sort((a, b) => b.mistakes - a.mistakes);
 
-    // 3. 学習推移グラフ用データの取得
     const thirtyDaysAgo = getJSTDate(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const { data: logD } = await supabase.from('daily_logs').select('*').eq('user_id', targetUser.id).gte('date', formatDate(thirtyDaysAgo)).order('date', { ascending: true });
     
-    // ★ 救済措置用の streak 初期値セット（反転させて先頭＝最新を取得）
     if (logD && logD.length > 0) {
-        const [...reversedLogs] = [...logD].reverse();
-        const [lastLog] = reversedLogs;
+        const [lastLog] = logD.slice().reverse();
         setEditStreak(lastLog?.streak || 0);
     } else {
         setEditStreak(0);
@@ -189,7 +185,7 @@ export default function Home() {
         ranks,
         weakWords: weakList,
         checkWords: [],
-        recentLogs: logD ? [...logD].reverse() : [],
+        recentLogs: logD ? logD.slice().reverse() : [],
         graphData: logD?.map(l => ({ date: l.date.slice(5).replace('-', '/'), count: l.count || 0 })) || [],
         pieData: [
             { name: '未習得', value: ranks.learning },
@@ -268,6 +264,13 @@ export default function Home() {
     setFeedbackMsg(null); setIsProcessing(false); setIsTransitioning(false);
     setShowHint(false); setShowFlashAnswer(false);
     
+    // 手書き・自己判定用のステートとキャンバスをリセット
+    setGameStep(0);
+    if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+    
     const nextLMode = (selectedInputMode === 'typing_read') ? 'kanji_to_read' : 'read_to_kanji';
     setLangMode(nextLMode);
     
@@ -288,10 +291,19 @@ export default function Home() {
     const limit = selectedMode === 'weekend' ? (challengeSettings.special_quest_count || 10) : (challengeSettings.quest_count || 5);
     setCurrentGameGoal(limit);
     
-    const { data: allW } = await supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target);
+    // ★ 追加：級の選択（targetKyu）をクエリに反映させる
+    let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target);
+    if (targetKyu !== 'all') {
+      query = query.eq('kanji_level', targetKyu);
+    }
+    const { data: allW } = await query;
     const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id);
 
-    if (!allW?.length) { setLoading(false); return; }
+    if (!allW?.length) { 
+        alert(`選んだ級（${targetKyu}）の単語がまだないワン！🐶`);
+        setLoading(false); 
+        return; 
+    }
     
     setCachedAllWords(allW);
 
@@ -325,7 +337,7 @@ export default function Home() {
     const today = getTodayJST();
     const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).single();
     
-    const curWord = questQueue[currentIndex];
+    const [curWord] = questQueue.slice(currentIndex);
     const nEntry = { time: getJSTTimeString(), word: curWord?.kanji, mode: MODE_NAMES[mode], result: correct ? 'correct' : 'incorrect' };
     
     const nT = (cLog?.study_time_seconds || 0) + pendingTimeRef.current;
@@ -358,7 +370,7 @@ export default function Home() {
   const checkAnswer = async (ans: string, isVoice: boolean = false) => {
     if (isProcessing || showRick) return;
     setIsProcessing(true);
-    const cur = questQueue[currentIndex];
+    const [cur] = questQueue.slice(currentIndex);
     const cor = langMode === 'read_to_kanji' ? cur.kanji : getFullReading(cur.reading, cur.okurigana);
     
     const normalize = (str: string) => str.replace(/[\u30a1-\u30f6]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0x60)).replace(/[\u3000\s]/g, '');
@@ -408,7 +420,10 @@ export default function Home() {
             const { data: yLog } = await supabase.from('daily_logs').select('streak').eq('user_id', currentUser.id).eq('date', yesterday).single();
             const newStreak = (yLog?.streak || 0) + 1;
             
-            await supabase.from('daily_logs').update({ is_completed: true, streak: newStreak }).eq('user_id', currentUser.id).eq('date', getTodayJST());
+            const today = getTodayJST();
+            await supabase.from('daily_logs').update({ is_completed: true, streak: newStreak }).eq('user_id', currentUser.id).eq('date', today);
+
+            setDailyProgress((prev: any) => ({ ...prev, is_completed: true, streak: newStreak }));
 
             const goal = challengeSettings.reward_goal_days || 14;
             if (newStreak > 0 && newStreak % goal === 0) {
@@ -439,20 +454,94 @@ export default function Home() {
         
         const { data: tips } = await supabase.from(currentUser.defaultTipTable).select('content');
         const allTips = tips?.map(t => t.content) || [];
-        const [ ...shuffledTips ] = allTips.sort(() => 0.5 - Math.random());
+        const shuffledTips = allTips.slice().sort(() => 0.5 - Math.random());
         
         setRewardTipsList(shuffledTips.slice(0, Math.min(10, cCount)));
         setView('result');
 
     } else {
         setCurrentIndex(nextIdx);
-        const [ nextWord ] = questQueue.slice(nextIdx, nextIdx + 1);
+        const [ nextWord ] = questQueue.slice(nextIdx);
         if (nextWord) {
             prepareQuestion(nextWord, cachedAllWords);
         }
     }
     setIsTransitioning(false);
   }, [currentIndex, questQueue, cachedAllWords, dailyProgress.study_time_seconds, mode, currentUser, prepareQuestion, stopSpeaking, selectedInputMode, playSound, challengeSettings]);
+
+  // --- 自己判定ハンドラー（早期リターンより前に追加） ---
+  const handleSelfJudge = async (isCorrect: boolean) => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    const [cur] = questQueue.slice(currentIndex);
+
+    if (isCorrect) {
+        playSound('correct'); 
+        confetti({ particleCount: 50 });
+    } else {
+        playSound('wrong'); 
+        setMistakeCount(prev => prev + 1);
+    }
+
+    await updateProgress(cur.id, isCorrect);
+    nextQuestion();
+    setIsProcessing(false);
+  };
+
+  // --- キャンバス描画ハンドラー ---
+  const startDrawing = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    
+    // 表示サイズと内部解像度の比率を計算して座標を補正
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    
+    setIsDrawing(true);
+    setLastPosition({ x, y });
+  }, []);
+
+  const draw = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !lastPosition) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    
+    // 表示サイズと内部解像度の比率を計算して座標を補正
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    
+    ctx.beginPath();
+    ctx.moveTo(lastPosition.x, lastPosition.y);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#334155'; // 鉛筆らしい色（stone-700）
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    
+    setLastPosition({ x, y });
+  }, [isDrawing, lastPosition]);
+
+  const stopDrawing = useCallback(() => {
+    setIsDrawing(false);
+    setLastPosition(null);
+  }, []);
+
+  const clearCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }, []);
 
   // --- カレンダー描画 ---
   const renderCalendar = useCallback(() => {
@@ -490,6 +579,34 @@ export default function Home() {
     );
   }, [calendarDate, monthlyLogs, currentUser]);
 
+  // ★ 追加：Rickからの挑戦状（級と未習得状態に基づく抽出）
+  useEffect(() => {
+    const fetchReviewCandidates = async () => {
+      let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target);
+      if (targetKyu !== 'all') {
+        query = query.eq('kanji_level', targetKyu);
+      }
+      const { data: allWords } = await query;
+      const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id);
+      
+      if (allWords) {
+          const progressMap = new Map();
+          progress?.forEach(p => progressMap.set(p.question_id, p.status));
+          
+          // 「進捗データが存在しない」または「learning（未習得）」の問題を抽出
+          const candidates = allWords.filter(w => {
+              const status = progressMap.get(w.id);
+              return !status || status === 'learning';
+          });
+          setReviewCandidates(candidates.sort(() => 0.5 - Math.random()).slice(0, 5));
+      }
+    };
+
+    if (view === 'menu') {
+        fetchReviewCandidates();
+    }
+  }, [currentUser.db_target, currentUser.id, targetKyu, view]);
+
   // --- ライフサイクル ---
   useEffect(() => { 
     const init = async () => {
@@ -500,27 +617,6 @@ export default function Home() {
       if (chal) {
         setHasParentChallenge(chal.mode === 'manual' ? (chal.selected_ids?.length > 0) : (chal.auto_count > 0));
         setChallengeSettings(chal);
-      }
-
-      // Rickからの挑戦状（苦手な漢字5件）の取得
-      const { data: weakData } = await supabase
-          .from('user_progress')
-          .select('question_id, mistake_count')
-          .eq('user_id', currentUser.id)
-          .gt('mistake_count', 0)
-          .order('mistake_count', { ascending: false })
-          .limit(5);
-
-      if (weakData && weakData.length > 0) {
-          const ids = weakData.map(w => w.question_id);
-          const { data: weakWords } = await supabase.from('kanji_questions').select('*').in('id', ids);
-          
-          if (weakWords) {
-              const sortedWeak = ids.map(id => weakWords.find(w => w.id === id)).filter(Boolean) as KanjiWord[];
-              setReviewCandidates(sortedWeak);
-          }
-      } else {
-          setReviewCandidates([]);
       }
     };
     init();
@@ -548,12 +644,12 @@ export default function Home() {
       {...{
         currentUser, view, mode, questQueue, currentIndex, isTransitioning, 
         selectedInputMode, rickMode, inputMode: selectedInputMode.includes('quiz') ? 'quiz' : 'typing', 
-        langMode, gameStep: 0, setGameStep: () => {}, weekendPhase: 1, bossHp, currentGameGoal, 
+        langMode, gameStep, setGameStep, weekendPhase: 1, bossHp, currentGameGoal, 
         isBossAttacked: false, showRick, message, showHint, showFlashAnswer, mistakeCount, 
-        feedbackMsg, options, userAnswer, setUserAnswer, isListening, isDrawing: false, 
-        canvasRef, startDrawing: ()=>{}, draw: ()=>{}, stopDrawing: ()=>{}, clearCanvas: ()=>{}, 
+        feedbackMsg, options, userAnswer, setUserAnswer, isListening, isDrawing, 
+        canvasRef, startDrawing, draw, stopDrawing, clearCanvas, 
         startListening: () => setIsListening(!isListening), checkAnswer, 
-        handleSelfJudge: async(c:boolean)=>{ const [w]=questQueue.slice(currentIndex, currentIndex+1); await updateProgress(w.id, c); nextQuestion(); }, 
+        handleSelfJudge, 
         nextQuestion, stopSpeaking, setView: navTo, renderReading, speakWord, getFullReading
       }} 
     />

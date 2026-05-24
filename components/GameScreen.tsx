@@ -1,3 +1,4 @@
+// components/GameScreen.tsx
 'use client'
 import React from 'react'
 
@@ -32,7 +33,7 @@ type GameScreenProps = {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   startDrawing: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   draw: (e: React.PointerEvent<HTMLCanvasElement>) => void;
-  stopDrawing: (e: React.PointerEvent<HTMLCanvasElement>) => void;
+  stopDrawing: () => void;
   clearCanvas: () => void;
   startListening: () => void;
   checkAnswer: (ans: string, isVoice?: boolean) => void;
@@ -163,7 +164,17 @@ export default function GameScreen(props: GameScreenProps) {
                     {currentInputMode === 'canvas' ? (
                         <div className={`h-full w-full bg-white border-4 rounded-[2rem] shadow-inner relative transition-colors ${gameStep === 0 ? 'border-emerald-200' : 'border-stone-200'}`}>
                             {gameStep === 0 && <span className="absolute top-4 left-4 text-stone-300 font-black text-sm pointer-events-none tracking-widest animate-pulse">ここに書いてね！</span>}
-                            <canvas ref={canvasRef} width={400} height={300} className="w-full h-full touch-none cursor-crosshair" onPointerDown={startDrawing} onPointerMove={draw} onPointerUp={stopDrawing} style={{ touchAction: 'none' }} />
+                            <canvas 
+                              ref={canvasRef} 
+                              width={400} 
+                              height={300} 
+                              className="w-full h-full touch-none cursor-crosshair" 
+                              onPointerDown={startDrawing} 
+                              onPointerMove={draw} 
+                              onPointerUp={stopDrawing} 
+                              onPointerLeave={stopDrawing}
+                              style={{ touchAction: 'none' }} 
+                            />
                             {gameStep === 0 && <button onClick={clearCanvas} className="absolute bottom-4 right-4 bg-stone-100 text-stone-500 px-4 py-2 rounded-full text-xs font-black shadow-sm active:scale-90 transition">🗑️ 書きなおす</button>}
                         </div>
                     ) : (
@@ -183,9 +194,17 @@ export default function GameScreen(props: GameScreenProps) {
                     )}
                   </div>
 
-                  {/* ★ 自己判定ボタン（タスク1-4/1-3: 巨大化・押しやすさ向上） */}
+                  {/* ★ 自己判定ボタン */}
                   {gameStep === 0 ? (
-                      <button onClick={() => { setGameStep(1); }} className="w-full bg-stone-800 text-white font-black py-6 rounded-[2rem] shadow-xl active:scale-95 transition text-2xl tracking-widest mt-auto border-b-8 border-stone-950">答え合わせ！ 👀</button>
+                      <button 
+                        onClick={() => { 
+                            setGameStep(1); 
+                            speakWord(word.kanji); // 正解表示時に読み上げ
+                        }} 
+                        className="w-full bg-stone-800 text-white font-black py-6 rounded-[2rem] shadow-xl active:scale-95 transition text-2xl tracking-widest mt-auto border-b-8 border-stone-950"
+                      >
+                        答え合わせ！ 👀
+                      </button>
                   ) : (
                       <div className="w-full flex flex-col gap-4 animate-in slide-in-from-bottom-4 mt-auto">
                           <div className="flex gap-4 w-full">
