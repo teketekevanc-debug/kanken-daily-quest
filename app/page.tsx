@@ -155,7 +155,8 @@ export default function Home() {
     await fetchMonthlyLogs(calendarDate, targetUser.id);
 
     const { count: totalCount } = await supabase.from('kanji_questions').select('*', { count: 'exact', head: true }).eq('target_user', targetUser.db_target);
-    const { data: progress } = await supabase.from('user_progress').select('status, mistake_count, question_id, kanji_questions(kanji, reading, okurigana)').eq('user_id', targetUser.id);
+    // ★修正: 上限に引っかからないように.limit(3000)を追加
+    const { data: progress } = await supabase.from('user_progress').select('status, mistake_count, question_id, kanji_questions(kanji, reading, okurigana)').eq('user_id', targetUser.id).limit(3000);
     
     const ranks = { learning: 0, bronze: 0, silver: 0, gold: 0 };
     let weakList: any[] = [];
@@ -201,8 +202,9 @@ export default function Home() {
   }, [calendarDate, fetchMonthlyLogs, getFullReading]);
 
   const fetchAllWordsForEdit = useCallback(async () => {
-    const { data: words } = await supabase.from('kanji_questions').select('*').eq('target_user', adminTargetUser.db_target).order('id', { ascending: false });
-    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', adminTargetUser.id);
+    // ★修正: 1000件上限突破のため.limit(3000)を追加
+    const { data: words } = await supabase.from('kanji_questions').select('*').eq('target_user', adminTargetUser.db_target).order('id', { ascending: false }).limit(3000);
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', adminTargetUser.id).limit(3000);
     if (words) {
         const sMap = new Map();
         progress?.forEach((p: any) => sMap.set(p.question_id, p.status));
@@ -283,20 +285,17 @@ export default function Home() {
     setMode(selectedMode); 
     setOpenedChests([]); 
     setMistakeCount(0);
-    
-    // ★ 修正箇所：強制的に 'write_self' に上書きしていた処理を削除しました。
-    // メニューで選択した 'selectedInputMode' がそのまま尊重されます。
 
     const limit = selectedMode === 'weekend' ? (challengeSettings.special_quest_count || 10) : (challengeSettings.quest_count || 5);
     setCurrentGameGoal(limit);
     
-    // 級の選択（targetKyu）をクエリに反映させる
-    let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target);
+    // ★修正: 上限に引っかからないように.limit(3000)を追加
+    let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
     if (targetKyu !== 'all') {
       query = query.eq('kanji_level', targetKyu);
     }
     const { data: allW } = await query;
-    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id);
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id).limit(3000);
 
     if (!allW?.length) { 
         alert(`選んだ級（${targetKyu}）の単語がまだないワン！🐶`);
@@ -309,7 +308,8 @@ export default function Home() {
     let queue;
     if (selectedMode === 'daily') {
       const statusMap = new Map(progress?.map(p => [p.question_id, p.status]));
-      const statusOrder: Record<string, number> = { gold: 0, silver: 1, bronze: 2, learning: 3 };
+      // ★修正: 未学習(learning)が最初(0)に選ばれるよう優先順位を是正
+      const statusOrder: Record<string, number> = { learning: 0, bronze: 1, silver: 2, gold: 3 };
 
       queue = [...allW].sort((a, b) => {
         const rankA = statusOrder[statusMap.get(a.id) || 'learning'];
@@ -317,6 +317,22 @@ export default function Home() {
         if (rankA !== rankB) return rankA - rankB;
         return 0.5 - Math.random();
       }).slice(0, limit);
+    } else if (selectedMode === 'parent_challenge') {
+      if (challengeSettings.mode === 'manual' && challengeSettings.selected_ids?.length > 0) {
+          queue = allW.filter(w => challengeSettings.selected_ids.includes(w.id)).slice(0, limit);
+      } else {
+          const { data: progData } = await supabase.from('user_progress').select('question_id, mistake_count').eq('user_id', currentUser.id).order('mistake_count', { ascending: false });
+          if (progData && progData.length > 0) {
+              const weakIds = progData.filter(p => p.mistake_count > 0).slice(0, challengeSettings.auto_count || 5).map(p => p.question_id);
+              queue = allW.filter(w => weakIds.includes(w.id));
+              if (queue.length < limit) {
+                  const others = allW.filter(w => !weakIds.includes(w.id)).sort(() => 0.5 - Math.random()).slice(0, limit - queue.length);
+                  queue = [...queue, ...others];
+              }
+          } else {
+              queue = [...allW].sort(() => 0.5 - Math.random()).slice(0, limit);
+          }
+      }
     } else {
       queue = [...allW].sort(() => 0.5 - Math.random()).slice(0, limit);
     }
@@ -343,9 +359,13 @@ export default function Home() {
     const nV = (cLog?.collection_views || 0) + pendingViewsRef.current;
     pendingTimeRef.current = 0; pendingViewsRef.current = 0;
     
+    const nextCount = correct ? (cLog?.count || 0) + 1 : (cLog?.count || 0);
+    const dailyGoal = challengeSettings.quest_count || 5;
+    const nextCompleted = cLog?.is_completed || (nextCount >= dailyGoal);
+
     const lD = { 
-      count: correct ? (cLog?.count || 0) + 1 : (cLog?.count || 0), 
-      is_completed: (cLog?.count || 0) >= (currentGameGoal - 1) && correct, 
+      count: nextCount, 
+      is_completed: nextCompleted, 
       details: [...(cLog?.details || []), nEntry], 
       study_time_seconds: nT, 
       collection_views: nV 
@@ -415,30 +435,44 @@ export default function Home() {
         playSound('clear');
         
         if (mode === 'daily') {
-            const yesterday = getYesterdayJST();
-            const { data: yLog } = await supabase.from('daily_logs').select('streak').eq('user_id', currentUser.id).eq('date', yesterday).single();
-            const newStreak = (yLog?.streak || 0) + 1;
-            
             const today = getTodayJST();
-            await supabase.from('daily_logs').update({ is_completed: true, streak: newStreak }).eq('user_id', currentUser.id).eq('date', today);
+            const { data: cLog } = await supabase.from('daily_logs').select('streak, is_completed').eq('user_id', currentUser.id).eq('date', today).single();
+            
+            if (!dailyProgress.is_completed && !cLog?.is_completed) {
+                const yesterday = getYesterdayJST();
+                const { data: yLog } = await supabase.from('daily_logs').select('streak').eq('user_id', currentUser.id).eq('date', yesterday).single();
+                const newStreak = (yLog?.streak || 0) + 1;
 
-            setDailyProgress((prev: any) => ({ ...prev, is_completed: true, streak: newStreak }));
+                await supabase.from('daily_logs').update({ is_completed: true, streak: newStreak }).eq('user_id', currentUser.id).eq('date', today);
+                setDailyProgress((prev: any) => ({ ...prev, is_completed: true, streak: newStreak }));
 
-            const goal = challengeSettings.reward_goal_days || 14;
-            if (newStreak > 0 && newStreak % goal === 0) {
-                const newOwned = (challengeSettings.owned_rewards || 0) + 1;
-                const newTotal = (challengeSettings.total_earned_rewards || 0) + 1;
-                
-                await supabase.from('challenge_settings').update({ 
-                    owned_rewards: newOwned,
-                    total_earned_rewards: newTotal
-                }).eq('target_user_id', currentUser.id);
-                
-                setChallengeSettings((prev: any) => ({ 
-                    ...prev, 
-                    owned_rewards: newOwned, 
-                    total_earned_rewards: newTotal 
-                }));
+                const goal = challengeSettings.reward_goal_days || 14;
+                if (newStreak > 0 && newStreak % goal === 0) {
+                    const newOwned = (challengeSettings.owned_rewards || 0) + 1;
+                    const newTotal = (challengeSettings.total_earned_rewards || 0) + 1;
+                    
+                    await supabase.from('challenge_settings').update({ 
+                        owned_rewards: newOwned,
+                        total_earned_rewards: newTotal
+                    }).eq('target_user_id', currentUser.id);
+                    
+                    setChallengeSettings((prev: any) => ({ 
+                        ...prev, 
+                        owned_rewards: newOwned, 
+                        total_earned_rewards: newTotal 
+                    }));
+                }
+            } else {
+                await supabase.from('daily_logs').update({ is_completed: true }).eq('user_id', currentUser.id).eq('date', today);
+                setDailyProgress((prev: any) => ({ ...prev, is_completed: true }));
+            }
+        } else {
+            const today = getTodayJST();
+            const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).single();
+            if (cLog) {
+                const doneEntry = { time: getJSTTimeString(), word: 'ALL CLEAR', mode: MODE_NAMES[mode] || mode, result: 'done' };
+                await supabase.from('daily_logs').update({ details: [...(cLog.details || []), doneEntry] }).eq('id', cLog.id);
+                setDailyProgress((prev: any) => ({ ...prev, details: [...(prev.details || []), doneEntry] }));
             }
         }
 
@@ -466,7 +500,7 @@ export default function Home() {
         }
     }
     setIsTransitioning(false);
-  }, [currentIndex, questQueue, cachedAllWords, dailyProgress.study_time_seconds, mode, currentUser, prepareQuestion, stopSpeaking, selectedInputMode, playSound, challengeSettings]);
+  }, [currentIndex, questQueue, cachedAllWords, dailyProgress, mode, currentUser, prepareQuestion, stopSpeaking, selectedInputMode, playSound, challengeSettings]);
 
   // --- 自己判定ハンドラー ---
   const handleSelfJudge = async (isCorrect: boolean) => {
@@ -581,18 +615,18 @@ export default function Home() {
   // Rickからの挑戦状（級と未習得状態に基づく抽出）
   useEffect(() => {
     const fetchReviewCandidates = async () => {
-      let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target);
+      // ★修正: 上限に引っかからないように.limit(3000)を追加
+      let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
       if (targetKyu !== 'all') {
         query = query.eq('kanji_level', targetKyu);
       }
       const { data: allWords } = await query;
-      const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id);
+      const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id).limit(3000);
       
       if (allWords) {
           const progressMap = new Map();
           progress?.forEach(p => progressMap.set(p.question_id, p.status));
           
-          // 「進捗データが存在しない」または「learning（未習得）」の問題を抽出
           const candidates = allWords.filter(w => {
               const status = progressMap.get(w.id);
               return !status || status === 'learning';
@@ -642,7 +676,10 @@ export default function Home() {
     <GameScreen 
       {...{
         currentUser, view, mode, questQueue, currentIndex, isTransitioning, 
-        selectedInputMode, rickMode, inputMode: selectedInputMode.includes('quiz') ? 'quiz' : 'typing', 
+        selectedInputMode, rickMode, 
+        inputMode: selectedInputMode === 'write_canvas' ? 'canvas' :
+                   selectedInputMode === 'write_self' ? 'self' :
+                   selectedInputMode === 'typing_read' ? 'typing' : 'quiz', 
         langMode, gameStep, setGameStep, weekendPhase: 1, bossHp, currentGameGoal, 
         isBossAttacked: false, showRick, message, showHint, showFlashAnswer, mistakeCount, 
         feedbackMsg, options, userAnswer, setUserAnswer, isListening, isDrawing, 
