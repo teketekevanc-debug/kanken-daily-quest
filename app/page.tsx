@@ -35,7 +35,7 @@ export default function Home() {
   const [view, setView] = useState<'menu'|'game'|'rick_challenge'|'result'|'admin'|'collection'>('menu')
   const [mode, setMode] = useState<'daily'|'free'|'weekend'|'parent_challenge'|'rick_challenge'|'revenge'>('daily')
   const [loading, setLoading] = useState(false); 
-  const [targetKyu, setTargetKyu] = useState<string>('all')
+  const [targetKyu, setTargetKyu] = useState<string>('kyu6')
   const [selectedInputMode, setSelectedInputMode] = useState<'quiz_kanji'|'typing_read'|'write_canvas'|'write_self'>('quiz_kanji')
   const [rickMode, setRickMode] = useState<'read'|'think'|'write'>('read')
   const [adminTargetUser, setAdminTargetUser] = useState(defaultUser)

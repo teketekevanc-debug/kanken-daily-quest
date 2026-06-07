@@ -1,3 +1,4 @@
+// lib/constants.ts
 // --- 型定義 ---
 
 export type KanjiWord = {
@@ -50,7 +51,6 @@ export type ChallengeSettings = {
   unlocked_tips: string[];
 };
 
-// ★ ビルドエラーを解消するための重要な定義
 export type ProgressStats = {
   total: number;
   mastered: number;
@@ -86,15 +86,16 @@ export const USERS = [
   { id: 'kenta', db_target: 'parent', name: 'けんた', color: 'bg-emerald-500', light: 'bg-emerald-50', border: 'border-emerald-500', text: 'text-emerald-700', hue: 'from-emerald-400 to-teal-500', defaultTipTable: 'minecraft_tips' }
 ];
 
+// ★ 6級・5級を優先するよう並べ替えました
 export const CATEGORIES = [
+  { id: 'kyu6', name: '6級 (小5)' },
+  { id: 'kyu5', name: '5級 (小6)' },
   { id: 'exam_kyu6', name: '🔥漢検6級 過去問対策' },
   { id: 'exam_kyu5', name: '🔥漢検5級 過去問対策' },
   { id: 'kyu10', name: '10級 (小1)' },
   { id: 'kyu9', name: '9級 (小2)' },
   { id: 'kyu8', name: '8級 (小3)' },
   { id: 'kyu7', name: '7級 (小4)' },
-  { id: 'kyu6', name: '6級 (小5)' },
-  { id: 'kyu5', name: '5級 (小6)' },
   { id: 'general', name: '一般・中学以上' }
 ];
 
@@ -109,7 +110,6 @@ export const MODE_NAMES: Record<string, string> = {
 
 // --- ヘルパー関数 ---
 
-// 安全にユーザー名を取得する関数（分割代入ルール適用済み）
 export const getUserFirstName = (name: string) => {
   const parts = name.split(' ');
   const [first] = parts; 
@@ -118,7 +118,6 @@ export const getUserFirstName = (name: string) => {
 
 const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
 
-// たくま君のスケジュールに合わせた応援メッセージ
 export const getDailyMessage = (userId: string) => {
     if (userId !== 'brother') return "今日も自分のペースで頑張ろう！🚀";
     const day = getJSTDate().getDay();

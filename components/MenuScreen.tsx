@@ -1,5 +1,6 @@
 'use client'
 import React, { useState } from 'react'
+import { supabase } from "@/lib/supabaseClient"
 import { USERS, CATEGORIES, MODE_NAMES, getUserFirstName, getDailyMessage } from '@/lib/constants'
 
 type MenuScreenProps = {
@@ -37,6 +38,58 @@ export default function MenuScreen(props: MenuScreenProps) {
   } = props;
 
   const [showTipsModal, setShowTipsModal] = useState(false);
+  
+  // ★ 漢字リストモーダル用のステート
+  const [showKanjiList, setShowKanjiList] = useState(false);
+  const [kanjiList, setKanjiList] = useState<any[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState(false);
+  const [listTab, setListTab] = useState<'learning' | 'mastered'>('learning'); // ★ 追加: タブ管理
+
+  // ★ 漢字リストを取得して開く関数（進捗ステータスも取得）
+  const openKanjiList = async () => {
+    setShowKanjiList(true);
+    setIsLoadingList(true);
+    setListTab('learning'); // 開く時は常に「未習得」タブから
+
+    let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
+    if (targetKyu !== 'all') {
+      query = query.eq('kanji_level', targetKyu);
+    }
+    query = query.order('id', { ascending: true }); // ID順にソート
+    
+    const { data: words } = await query;
+    // 進捗データも取得して結合する
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id).limit(3000);
+
+    if (words) {
+      const pMap = new Map();
+      progress?.forEach(p => pMap.set(p.question_id, p.status));
+      const merged = words.map(w => ({ ...w, currentStatus: pMap.get(w.id) || 'learning' }));
+      setKanjiList(merged);
+    }
+    setIsLoadingList(false);
+  };
+
+  // ★ 「覚えた！」ボタンを押した時の処理
+  const handleToggleRemembered = async (word: any) => {
+    const isMastered = word.currentStatus === 'gold';
+    const newStatus = isMastered ? 'learning' : 'gold';
+
+    // 画面上のリストを即座に更新（サクサク操作できるように）
+    setKanjiList(prev => prev.map(w => w.id === word.id ? { ...w, currentStatus: newStatus } : w));
+
+    // データベースの更新
+    if (isMastered) {
+      await supabase.from('user_progress').delete().eq('user_id', currentUser.id).eq('question_id', word.id);
+    } else {
+      await supabase.from('user_progress').upsert({
+        user_id: currentUser.id,
+        question_id: word.id,
+        status: 'gold',
+        last_reviewed_at: new Date().toISOString()
+      }, { onConflict: 'user_id, question_id' });
+    }
+  };
 
   const streakData = [dailyProgress?.streak || 0];
   const [streak] = streakData;
@@ -63,6 +116,14 @@ export default function MenuScreen(props: MenuScreenProps) {
   const displayCountData = [challengeSettings?.quest_count || 5];
   const [displayCount] = displayCountData;
 
+  // ★ 漢検試験日（6月21日）までのカウントダウン計算
+  const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const today = getJSTDate();
+  today.setHours(0, 0, 0, 0);
+  const examDay = new Date('2026-06-21T00:00:00+09:00');
+  const diffTime = examDay.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
   return (
     <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans transition-colors duration-500`}>
       
@@ -80,8 +141,27 @@ export default function MenuScreen(props: MenuScreenProps) {
       </div>
       <h1 className={`text-3xl font-black ${currentUser.text} mb-2 tracking-widest drop-shadow-sm`}>毎日漢検クエスト</h1>
       
+      {/* 漢検カウントダウン */}
+      <div className="w-full max-w-sm bg-gradient-to-r from-rose-50 to-orange-50 border-4 border-rose-200 p-4 rounded-3xl shadow-sm mb-4 flex items-center justify-between relative overflow-hidden">
+        <div className="absolute -right-4 -bottom-4 text-7xl opacity-20">🔥</div>
+        <div className="relative z-10">
+          <p className="text-[11px] font-black text-rose-500 mb-1 tracking-widest">漢検試験 (6月21日) まで</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-xl font-black text-rose-600">あと</span>
+            <span className="text-5xl font-black text-rose-600 drop-shadow-sm">{Math.max(0, diffDays)}</span>
+            <span className="text-xl font-black text-rose-600">日！</span>
+          </div>
+        </div>
+        <div className="text-5xl relative z-10 drop-shadow-md animate-bounce">📝</div>
+      </div>
+
       <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">
-          <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🎯</span> 出題するカテゴリ</p>
+          <div className="flex items-center justify-between mb-3">
+             <p className="text-xs font-black text-stone-400 flex items-center gap-1"><span>🎯</span> 出題するカテゴリ</p>
+             <button onClick={openKanjiList} className="bg-sky-50 text-sky-600 border border-sky-200 text-[10px] font-black px-3 py-1.5 rounded-full active:scale-95 transition flex items-center gap-1 shadow-sm">
+                <span>📖</span> 漢字リストを眺める
+             </button>
+          </div>
           <select value={targetKyu} onChange={e => setTargetKyu(e.target.value)} className="w-full p-3 border-2 border-stone-200 rounded-xl text-sm font-black text-stone-700 bg-stone-50 outline-none focus:border-sky-400 mb-5 text-center shadow-inner">
             <option value="all">すべてのカテゴリから出題</option>
             {CATEGORIES.filter((c: any) => c.id !== 'general').map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -89,7 +169,6 @@ export default function MenuScreen(props: MenuScreenProps) {
 
           <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🕹️</span> 回答モード</p>
           <div className="grid grid-cols-2 gap-2 mb-2">
-            {/* ★ ここが特訓用の封印ボタン */}
             <button 
               onClick={() => setSelectedInputMode('quiz_kanji')} 
               disabled={currentUser.id === 'brother'}
@@ -244,6 +323,69 @@ export default function MenuScreen(props: MenuScreenProps) {
         >
           <span>👨‍👩‍👧‍👦</span> 保護者管理メニュー
         </button>
+      )}
+
+      {/* ★ 漢字リストモーダル（タブ切り替え対応） */}
+      {showKanjiList && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in" onClick={() => setShowKanjiList(false)}>
+          <div className="bg-white w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
+            
+            <div className="bg-sky-50 p-5 border-b-4 border-sky-100 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-sky-800 flex items-center gap-2"><span>📖</span> 漢字リスト</h3>
+                <p className="text-[10px] font-bold text-sky-600 mt-1">選択中のカテゴリの漢字を眺めよう</p>
+              </div>
+              <button onClick={() => setShowKanjiList(false)} className="bg-white text-sky-400 w-10 h-10 rounded-full font-black text-xl shadow-sm active:scale-90 transition border border-sky-100">✕</button>
+            </div>
+
+            {/* ★ タブ切り替えボタン */}
+            <div className="flex p-2 bg-stone-100 shrink-0 gap-2">
+              <button onClick={() => setListTab('learning')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'learning' ? 'bg-white text-sky-700 shadow-sm border-2 border-sky-100' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
+                未習得 ({kanjiList.filter(w => w.currentStatus !== 'gold').length})
+              </button>
+              <button onClick={() => setListTab('mastered')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'mastered' ? 'bg-white text-amber-600 shadow-sm border-2 border-amber-100' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
+                覚えた！ ({kanjiList.filter(w => w.currentStatus === 'gold').length})
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto bg-stone-50 flex-1 space-y-3 no-scrollbar relative">
+              {isLoadingList ? (
+                <div className="flex flex-col items-center justify-center py-20 text-stone-400">
+                  <div className="animate-spin text-4xl mb-4">🌀</div>
+                  <p className="font-bold text-sm tracking-widest">読み込み中...</p>
+                </div>
+              ) : kanjiList.filter(w => listTab === 'mastered' ? w.currentStatus === 'gold' : w.currentStatus !== 'gold').length > 0 ? (
+                kanjiList.filter(w => listTab === 'mastered' ? w.currentStatus === 'gold' : w.currentStatus !== 'gold').map((w, i) => (
+                  <div key={w.id} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-stone-100 flex items-center gap-4">
+                    <div className="shrink-0 flex flex-col items-center justify-center bg-stone-50 w-14 h-14 rounded-xl border border-stone-100">
+                      <span className="text-2xl font-black text-stone-800">{w.kanji}</span>
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="text-base font-black text-sky-700 mb-1">{renderReading(w.reading, w.okurigana)}</p>
+                      {w.sentence && <p className="text-[10px] font-bold text-stone-500 leading-snug">{w.sentence.replace('□', '〇')}</p>}
+                    </div>
+                    {/* ★ 覚えた/戻す 切り替えボタン */}
+                    <button 
+                      onClick={() => handleToggleRemembered(w)} 
+                      className={`shrink-0 px-3 py-2 rounded-xl text-[10px] font-black transition-all border-b-2 active:translate-y-0.5 active:border-b-0 ${
+                        w.currentStatus === 'gold' 
+                          ? 'bg-stone-100 text-stone-400 border-stone-200 hover:bg-stone-200' 
+                          : 'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200'
+                      }`}
+                    >
+                      {w.currentStatus === 'gold' ? '戻す' : '👑 覚えた'}
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-20">
+                  <p className="text-4xl mb-4">📭</p>
+                  <p className="text-stone-400 font-bold text-sm">このリストにはまだ<br/>漢字がないよ！</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {showTipsModal && (
