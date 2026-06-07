@@ -284,14 +284,13 @@ export default function Home() {
     setOpenedChests([]); 
     setMistakeCount(0);
     
-    if (selectedMode === 'daily') {
-      setSelectedInputMode('write_self');
-    }
+    // ★ 修正箇所：強制的に 'write_self' に上書きしていた処理を削除しました。
+    // メニューで選択した 'selectedInputMode' がそのまま尊重されます。
 
     const limit = selectedMode === 'weekend' ? (challengeSettings.special_quest_count || 10) : (challengeSettings.quest_count || 5);
     setCurrentGameGoal(limit);
     
-    // ★ 追加：級の選択（targetKyu）をクエリに反映させる
+    // 級の選択（targetKyu）をクエリに反映させる
     let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target);
     if (targetKyu !== 'all') {
       query = query.eq('kanji_level', targetKyu);
@@ -469,7 +468,7 @@ export default function Home() {
     setIsTransitioning(false);
   }, [currentIndex, questQueue, cachedAllWords, dailyProgress.study_time_seconds, mode, currentUser, prepareQuestion, stopSpeaking, selectedInputMode, playSound, challengeSettings]);
 
-  // --- 自己判定ハンドラー（早期リターンより前に追加） ---
+  // --- 自己判定ハンドラー ---
   const handleSelfJudge = async (isCorrect: boolean) => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -579,7 +578,7 @@ export default function Home() {
     );
   }, [calendarDate, monthlyLogs, currentUser]);
 
-  // ★ 追加：Rickからの挑戦状（級と未習得状態に基づく抽出）
+  // Rickからの挑戦状（級と未習得状態に基づく抽出）
   useEffect(() => {
     const fetchReviewCandidates = async () => {
       let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target);

@@ -162,20 +162,35 @@ export default function GameScreen(props: GameScreenProps) {
                   {/* メインエリア（キャンバスまたは隠し漢字） */}
                   <div className="relative w-full flex-1 min-h-[250px] mb-6">
                     {currentInputMode === 'canvas' ? (
-                        <div className={`h-full w-full bg-white border-4 rounded-[2rem] shadow-inner relative transition-colors ${gameStep === 0 ? 'border-emerald-200' : 'border-stone-200'}`}>
+                        <div className={`h-full w-full bg-white border-4 rounded-[2rem] shadow-inner relative overflow-hidden transition-colors ${gameStep === 0 ? 'border-emerald-200' : 'border-stone-200'}`}>
                             {gameStep === 0 && <span className="absolute top-4 left-4 text-stone-300 font-black text-sm pointer-events-none tracking-widest animate-pulse">ここに書いてね！</span>}
                             <canvas 
                               ref={canvasRef} 
                               width={400} 
                               height={300} 
-                              className="w-full h-full touch-none cursor-crosshair" 
-                              onPointerDown={startDrawing} 
-                              onPointerMove={draw} 
-                              onPointerUp={stopDrawing} 
-                              onPointerLeave={stopDrawing}
+                              className={`w-full h-full touch-none ${gameStep === 0 ? 'cursor-crosshair' : 'cursor-default'}`} 
+                              onPointerDown={gameStep === 0 ? startDrawing : undefined} 
+                              onPointerMove={gameStep === 0 ? draw : undefined} 
+                              onPointerUp={gameStep === 0 ? stopDrawing : undefined} 
+                              onPointerLeave={gameStep === 0 ? stopDrawing : undefined}
                               style={{ touchAction: 'none' }} 
                             />
-                            {gameStep === 0 && <button onClick={clearCanvas} className="absolute bottom-4 right-4 bg-stone-100 text-stone-500 px-4 py-2 rounded-full text-xs font-black shadow-sm active:scale-90 transition">🗑️ 書きなおす</button>}
+                            {gameStep === 0 && (
+                                <button onClick={clearCanvas} className="absolute bottom-4 right-4 bg-stone-100 text-stone-500 px-4 py-2 rounded-full text-xs font-black shadow-sm active:scale-90 transition">
+                                    🗑️ 書きなおす
+                                </button>
+                            )}
+
+                            {/* ★ 追加: 答え合わせ時 (gameStep === 1) の正解表示オーバーレイ */}
+                            {gameStep === 1 && (
+                                <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center animate-in zoom-in duration-300">
+                                    <span className="text-[9rem] font-black text-rose-500 leading-none drop-shadow-md">{word.kanji}</span>
+                                    <div className="absolute top-4 right-4">
+                                        <VoiceButton text={word.kanji} />
+                                    </div>
+                                    <span className="absolute bottom-4 text-rose-500 font-black tracking-widest text-sm animate-pulse bg-white/80 px-4 py-1 rounded-full">自分の字と見比べてね！</span>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="h-full w-full bg-stone-50 border-4 border-dashed border-stone-200 rounded-[2.5rem] flex items-center justify-center">
