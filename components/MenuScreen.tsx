@@ -26,6 +26,7 @@ type MenuScreenProps = {
   fetchAdminStats: (user: any) => void;
   setAdminTargetUser: (user: any) => void;
   renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
+  studyTimerPanel: React.ReactNode;
 }
 
 export default function MenuScreen(props: MenuScreenProps) {
@@ -34,7 +35,7 @@ export default function MenuScreen(props: MenuScreenProps) {
     targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode,
     rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal,
     hasParentChallenge, startGame, setView, fetchCollection, renderCalendar,
-    stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading
+    stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, studyTimerPanel
   } = props;
 
   const [showTipsModal, setShowTipsModal] = useState(false);
@@ -153,6 +154,10 @@ export default function MenuScreen(props: MenuScreenProps) {
           </div>
         </div>
         <div className="text-5xl relative z-10 drop-shadow-md animate-bounce">📝</div>
+      </div>
+
+      <div className="w-full max-w-sm mb-6">
+        {studyTimerPanel}
       </div>
 
       <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">

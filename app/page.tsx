@@ -10,6 +10,7 @@ import MenuScreen from '@/components/MenuScreen'
 import AdminScreen from '@/components/AdminScreen'
 import GameScreen from '@/components/GameScreen'
 import CollectionScreen from '@/components/CollectionScreen'
+import StudyTimerPanel from '@/components/StudyTimerPanel'
 
 // --- ヘルパー関数 ---
 const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
@@ -82,6 +83,10 @@ export default function Home() {
 
   const pendingTimeRef = useRef(0);
   const pendingViewsRef = useRef(0);
+  const studySecondsRef = useRef(0);
+  const [studySeconds, setStudySeconds] = useState(0);
+  const [isStudyTimerRunning, setIsStudyTimerRunning] = useState(false);
+  const [isKanjiCardVisible, setIsKanjiCardVisible] = useState(false);
 
   // --- 基本ヘルパー・音声 ---
   const stopSpeaking = useCallback(() => {
@@ -271,18 +276,12 @@ export default function Home() {
     if (error) alert('判定を保存できませんでした: ' + error.message);
   }, [currentUser.id]);
 
-  const saveCollectionStudySession = useCallback(async () => {
-    const studySeconds = pendingTimeRef.current;
-    const collectionViews = pendingViewsRef.current;
-    pendingTimeRef.current = 0;
-    pendingViewsRef.current = 0;
-    if (studySeconds === 0 && collectionViews === 0) return;
-
+  const saveCompletedStudyTimer = useCallback(async () => {
     const today = getTodayJST();
     const { data: todayLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
     const updates = {
-      study_time_seconds: (todayLog?.study_time_seconds || 0) + studySeconds,
-      collection_views: (todayLog?.collection_views || 0) + collectionViews
+      study_time_seconds: (todayLog?.study_time_seconds || 0) + 600,
+      collection_views: todayLog?.collection_views || 0
     };
     if (todayLog) {
       await supabase.from('daily_logs').update(updates).eq('id', todayLog.id);
@@ -291,6 +290,34 @@ export default function Home() {
     }
     setDailyProgress((prev: any) => ({ ...prev, date: today, ...updates }));
   }, [currentUser.id]);
+
+  const startStudyTimer = useCallback(() => {
+    if (studySecondsRef.current >= 600) {
+      studySecondsRef.current = 0;
+      setStudySeconds(0);
+    }
+    setIsStudyTimerRunning(true);
+    if (view !== 'collection') {
+      fetchAllWordsForEdit(currentUser);
+      setView('collection');
+    }
+  }, [currentUser, fetchAllWordsForEdit, view]);
+
+  useEffect(() => {
+    if (!isStudyTimerRunning || !isKanjiCardVisible) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      const nextSeconds = Math.min(studySecondsRef.current + 1, 600);
+      studySecondsRef.current = nextSeconds;
+      setStudySeconds(nextSeconds);
+      if (nextSeconds >= 600) {
+        window.clearInterval(timer);
+        setIsStudyTimerRunning(false);
+        void saveCompletedStudyTimer();
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isKanjiCardVisible, isStudyTimerRunning, saveCompletedStudyTimer]);
 
   const sendLineToChild = useCallback(async (msg: string) => {
     const res = await fetch('/api/line/send', { method: 'POST', body: JSON.stringify({ message: msg }) });
@@ -701,7 +728,7 @@ export default function Home() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (['game', 'collection', 'rick_challenge'].includes(view)) {
+    if (['game', 'rick_challenge'].includes(view)) {
       interval = setInterval(() => { pendingTimeRef.current += 1; }, 1000);
     }
     return () => clearInterval(interval);
@@ -709,14 +736,32 @@ export default function Home() {
 
   const navTo = (v: any) => { stopSpeaking(); setShowRick(false); setView(v); };
 
+  const studyTimerPanel = (
+    <StudyTimerPanel
+      elapsedSeconds={studySeconds}
+      isRunning={isStudyTimerRunning}
+      isKanjiVisible={isKanjiCardVisible}
+      onStart={startStudyTimer}
+      onPause={() => setIsStudyTimerRunning(false)}
+    />
+  );
+  const withGlobalTimer = (screen: React.ReactNode) => (
+    <>
+      {screen}
+      <div className="fixed inset-x-3 bottom-3 z-40 mx-auto w-full max-w-md">
+        {studyTimerPanel}
+      </div>
+    </>
+  );
+
   // --- メインレンダリング ---
-  if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading}} />;
+  if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, studyTimerPanel}} />;
   
-  if (view === 'admin') return <AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />;
+  if (view === 'admin') return withGlobalTimer(<AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />);
   
-  if (view === 'collection') return <CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onStudySessionComplete: saveCollectionStudySession}} />;
+  if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onKanjiVisibilityChange: setIsKanjiCardVisible}} />);
   
-  if (view === 'game' || view === 'rick_challenge') return (
+  if (view === 'game' || view === 'rick_challenge') return withGlobalTimer(
     <GameScreen 
       {...{
         currentUser, view, mode, questQueue, currentIndex, isTransitioning, 
@@ -743,7 +788,7 @@ export default function Home() {
     const progP = Math.min(100, (tS / threshold) * 100);
     const remainingMin = Math.ceil(Math.max(0, threshold - tS) / 60);
 
-    return (
+    return withGlobalTimer(
         <div className={`min-h-screen ${isRRoom ? 'bg-slate-950' : currentUser.light} flex flex-col items-center justify-center p-6 text-center font-sans transition-colors duration-1000`}>
             {isRRoom ? (
                 <div className="w-full max-w-lg animate-in fade-in zoom-in duration-700">

@@ -20,14 +20,14 @@ type CollectionScreenProps = {
     stopSpeaking: () => void;
     onViewCard?: () => void;
     onSelfJudge?: (word: CollectionWord, remembered: boolean) => void;
-    onStudySessionComplete?: () => void;
+    onKanjiVisibilityChange?: (isVisible: boolean) => void;
 };
 
 export default function CollectionScreen(props: CollectionScreenProps) {
     const { 
         currentUser, setView, allWordsList, challengeSettings, 
         speakWord, renderReading, getFullReading, stopSpeaking, onViewCard,
-        onSelfJudge, onStudySessionComplete
+        onSelfJudge, onKanjiVisibilityChange
     } = props;
     
     const [mainTab, setMainTab] = useState<'words'|'tips'>('words');
@@ -40,9 +40,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
     const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
     // ★ フラッシュカードの現在地インデックス
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-    const [studySeconds, setStudySeconds] = useState(0);
-    const [isStudyTimerRunning, setIsStudyTimerRunning] = useState(false);
-    const studySecondsRef = React.useRef(0);
 
     const unlockedTips = challengeSettings?.unlocked_tips || [];
 
@@ -83,30 +80,9 @@ export default function CollectionScreen(props: CollectionScreenProps) {
     }, [allWordsList, selectedCategory, searchQuery]);
 
     useEffect(() => {
-        if (!isStudyTimerRunning) return;
-        const timer = window.setInterval(() => {
-            const nextSeconds = Math.min(studySecondsRef.current + 1, 600);
-            studySecondsRef.current = nextSeconds;
-            setStudySeconds(nextSeconds);
-            if (nextSeconds >= 600) {
-                window.clearInterval(timer);
-                setIsStudyTimerRunning(false);
-                onStudySessionComplete?.();
-            }
-        }, 1000);
-        return () => window.clearInterval(timer);
-    }, [isStudyTimerRunning, onStudySessionComplete]);
-
-    const startStudySession = () => {
-        if (studySecondsRef.current >= 600) {
-            studySecondsRef.current = 0;
-            setStudySeconds(0);
-        }
-        setIsStudyTimerRunning(true);
-    };
-
-      const timerMinutes = Math.floor((600 - studySeconds) / 60);
-      const timerRemainder = (600 - studySeconds) % 60;
+      onKanjiVisibilityChange?.(selectedIndex !== null && mainTab === 'words' && selectedCategory !== null);
+      return () => onKanjiVisibilityChange?.(false);
+    }, [mainTab, onKanjiVisibilityChange, selectedCategory, selectedIndex]);
 
     // グリッドのタップ時の挙動（クイズ表示を解除 ＆ フラッシュカードを開く）
     const handleCardClick = (w: CollectionWord, index: number) => {
@@ -123,27 +99,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
         <div className={`min-h-screen ${currentUser.light} p-4 font-sans pb-24`}>
           <div className="max-w-2xl mx-auto">
 
-            <div className="mb-6 rounded-3xl border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black tracking-widest text-emerald-700">☀️ 朝の10分カード</p>
-                  <p className="mt-1 text-sm font-bold text-stone-600">
-                    {studySeconds >= 600 ? '今日の10分完了！よく頑張りました。' : `目標まで ${timerMinutes}分 ${String(timerRemainder).padStart(2, '0')}秒`}
-                  </p>
-                </div>
-                <button
-                  onClick={startStudySession}
-                  disabled={isStudyTimerRunning}
-                  className="shrink-0 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-md transition active:scale-95 disabled:cursor-default disabled:bg-stone-400"
-                >
-                  {isStudyTimerRunning ? '学習中…' : studySeconds >= 600 ? 'もう一度' : studySeconds > 0 ? '再開する' : '10分スタート'}
-                </button>
-              </div>
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-white shadow-inner">
-                <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-sky-500 transition-all" style={{ width: `${Math.min((studySeconds / 600) * 100, 100)}%` }} />
-              </div>
-            </div>
-            
             <div className="flex justify-between items-center mb-6">
               <button 
                 onClick={() => { 
