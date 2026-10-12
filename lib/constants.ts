@@ -86,8 +86,14 @@ export const USERS = [
   { id: 'kenta', db_target: 'parent', name: 'けんた', color: 'bg-emerald-500', light: 'bg-emerald-50', border: 'border-emerald-500', text: 'text-emerald-700', hue: 'from-emerald-400 to-teal-500', defaultTipTable: 'minecraft_tips' }
 ];
 
-// ★ 6級・5級を優先するよう並べ替えました
+// 受験対策・分野別の教材カテゴリ
 export const CATEGORIES = [
+  { id: 'kyu4', name: '4級(中学受験・頻出)' },
+  { id: 'idiom', name: '四字熟語・慣用句' },
+  { id: 'synonym_antonym', name: '対義語・類義語' },
+  { id: 'grammar', name: '言葉の知識・文法' },
+  { id: 'loanword_emotion', name: '外来語・心情語' },
+  { id: 'mission_100', name: '合格への100日特訓' },
   { id: 'kyu6', name: '小学5年相当' },
   { id: 'kyu5', name: '小学6年相当' },
   { id: 'exam_kyu6', name: '🔥受験頻出漢字（基礎）' },

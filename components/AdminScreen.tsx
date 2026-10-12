@@ -335,6 +335,9 @@ export default function AdminScreen(props: AdminScreenProps) {
             /* 省略：前回のコードと同じ */
             <div className="bg-white p-8 rounded-[2.5rem] shadow-md border-2 border-stone-100 text-left">
               <h3 className="font-black text-indigo-700 mb-6 text-xl">➕ 新しい言葉の登録</h3>
+              <p className="mb-5 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-xs font-bold leading-relaxed text-indigo-800">
+                受験対策では、意味だけでなく「文章の中で使えるか」を意識して登録します。活用例には自然な例文、成り立ち・解説には語の由来や見分け方を記入してください。
+              </p>
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-4">
                   <input className="border-2 border-stone-100 p-4 rounded-2xl font-black text-2xl outline-none focus:border-indigo-400 bg-stone-50 shadow-inner" placeholder="漢字" value={newWord.kanji} onChange={e => setNewWord({...newWord, kanji: e.target.value})} />
@@ -343,7 +346,9 @@ export default function AdminScreen(props: AdminScreenProps) {
                 <select className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold bg-stone-50 outline-none focus:border-indigo-400" value={newWord.category} onChange={e => setNewWord({...newWord, category: e.target.value})}>
                   {CATEGORIES.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
-                <textarea className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner min-h-[120px]" placeholder="例文" value={newWord.usage_example} onChange={e => setNewWord({...newWord, usage_example: e.target.value})} />
+                <input className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50" placeholder="送り仮名（必要な場合）" value={newWord.okurigana} onChange={e => setNewWord({...newWord, okurigana: e.target.value})} />
+                <textarea className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner min-h-[100px]" placeholder="活用例：意味が伝わる自然な例文。空欄部分は□にする" value={newWord.usage_example} onChange={e => setNewWord({...newWord, usage_example: e.target.value})} />
+                <textarea className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner min-h-[100px]" placeholder="成り立ち・解説：語源、意味の違い、文章中での見分け方など" value={newWord.origin_logic} onChange={e => setNewWord({...newWord, origin_logic: e.target.value})} />
                 <button onClick={onAddWordClick} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition hover:bg-indigo-700">追加する 🐾</button>
               </div>
             </div>
