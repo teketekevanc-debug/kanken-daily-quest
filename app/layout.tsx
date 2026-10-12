@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: '毎日漢検クエスト',
-  description: 'Rickと一緒に毎日漢字の特訓をしよう！',
+  title: '毎日受験クエスト',
+  description: 'Rickと一緒に毎日受験漢字を特訓しよう！',
   icons: {
     icon: '/Rick.png',
     apple: '/Rick.png',

@@ -1,23 +1,33 @@
 'use client'
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { CATEGORIES } from '@/lib/constants';
+import type { ChallengeSettings, KanjiWord } from '@/lib/constants';
+
+type CollectionWord = KanjiWord & {
+  kanji_level: string;
+  currentStatus?: string;
+  mistakeCount?: number;
+};
 
 type CollectionScreenProps = {
-    currentUser: any;
+    currentUser: { id: string; light: string };
     setView: (view: string) => void;
-    allWordsList: any[];
-    challengeSettings: any;
+    allWordsList: CollectionWord[];
+    challengeSettings: Pick<ChallengeSettings, 'unlocked_tips'> | null;
     speakWord: (text: string) => void;
     renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
     getFullReading: (reading: string, okurigana?: string | null) => string;
     stopSpeaking: () => void;
     onViewCard?: () => void;
+    onSelfJudge?: (word: CollectionWord, remembered: boolean) => void;
+    onStudySessionComplete?: () => void;
 };
 
 export default function CollectionScreen(props: CollectionScreenProps) {
     const { 
         currentUser, setView, allWordsList, challengeSettings, 
-        speakWord, renderReading, getFullReading, stopSpeaking, onViewCard 
+        speakWord, renderReading, getFullReading, stopSpeaking, onViewCard,
+        onSelfJudge, onStudySessionComplete
     } = props;
     
     const [mainTab, setMainTab] = useState<'words'|'tips'>('words');
@@ -27,33 +37,84 @@ export default function CollectionScreen(props: CollectionScreenProps) {
     
     // グリッドでのクイズ表示用に保持
     const [revealedCards, setRevealedCards] = useState<number[]>([]);
+    const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
     // ★ フラッシュカードの現在地インデックス
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    const [studySeconds, setStudySeconds] = useState(0);
+    const [isStudyTimerRunning, setIsStudyTimerRunning] = useState(false);
+    const studySecondsRef = React.useRef(0);
 
     const unlockedTips = challengeSettings?.unlocked_tips || [];
 
     const categoryStats = useMemo(() => {
-        return CATEGORIES.map(cat => {
+        const standardCategories = CATEGORIES.map(cat => {
             const words = allWordsList.filter(w => w.kanji_level === cat.id);
             const [total] = [words.length];
             const mastered = words.filter(w => w.currentStatus === 'gold').length;
             return { ...cat, total, mastered };
         });
-    }, [allWordsList]);
+        const mistakeWords = allWordsList.filter(w => (w.mistakeCount || 0) > 0);
+        const hardWords = allWordsList.filter(w => (w.mistakeCount || 0) >= 2);
+        return [
+          ...standardCategories,
+          {
+            id: 'mistakes',
+            name: currentUser.id === 'brother' ? 'タクマが間違えた漢字' : '間違えた漢字',
+            total: mistakeWords.length,
+            mastered: mistakeWords.filter(w => w.currentStatus === 'gold').length
+          },
+          {
+            id: 'hard',
+            name: '覚えにくい漢字',
+            total: hardWords.length,
+            mastered: hardWords.filter(w => w.currentStatus === 'gold').length
+          }
+        ];
+      }, [allWordsList, currentUser.id]);
 
     const filteredWords = useMemo(() => {
         return allWordsList.filter(w => {
-            if (w.kanji_level !== selectedCategory) return false;
+          if (selectedCategory === 'mistakes' && !((w.mistakeCount || 0) > 0)) return false;
+          if (selectedCategory === 'hard' && !((w.mistakeCount || 0) >= 2)) return false;
+          if (selectedCategory !== 'mistakes' && selectedCategory !== 'hard' && w.kanji_level !== selectedCategory) return false;
             if (searchQuery && !w.kanji.includes(searchQuery) && !w.reading.includes(searchQuery)) return false;
             return true;
         });
     }, [allWordsList, selectedCategory, searchQuery]);
 
+    useEffect(() => {
+        if (!isStudyTimerRunning) return;
+        const timer = window.setInterval(() => {
+            const nextSeconds = Math.min(studySecondsRef.current + 1, 600);
+            studySecondsRef.current = nextSeconds;
+            setStudySeconds(nextSeconds);
+            if (nextSeconds >= 600) {
+                window.clearInterval(timer);
+                setIsStudyTimerRunning(false);
+                onStudySessionComplete?.();
+            }
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [isStudyTimerRunning, onStudySessionComplete]);
+
+    const startStudySession = () => {
+        if (studySecondsRef.current >= 600) {
+            studySecondsRef.current = 0;
+            setStudySeconds(0);
+        }
+        setIsStudyTimerRunning(true);
+    };
+
+      const timerMinutes = Math.floor((600 - studySeconds) / 60);
+      const timerRemainder = (600 - studySeconds) % 60;
+
     // グリッドのタップ時の挙動（クイズ表示を解除 ＆ フラッシュカードを開く）
-    const handleCardClick = (w: any, index: number) => { 
-        if (!revealedCards.includes(w.id)) {
+    const handleCardClick = (w: CollectionWord, index: number) => {
+      const wasRevealed = revealedCards.includes(w.id);
+      if (!wasRevealed) {
             setRevealedCards([...revealedCards, w.id]);
         }
+      setIsAnswerRevealed(wasRevealed);
         if (onViewCard) onViewCard();
         setSelectedIndex(index);
     };
@@ -61,6 +122,27 @@ export default function CollectionScreen(props: CollectionScreenProps) {
     return (
         <div className={`min-h-screen ${currentUser.light} p-4 font-sans pb-24`}>
           <div className="max-w-2xl mx-auto">
+
+            <div className="mb-6 rounded-3xl border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black tracking-widest text-emerald-700">☀️ 朝の10分カード</p>
+                  <p className="mt-1 text-sm font-bold text-stone-600">
+                    {studySeconds >= 600 ? '今日の10分完了！よく頑張りました。' : `目標まで ${timerMinutes}分 ${String(timerRemainder).padStart(2, '0')}秒`}
+                  </p>
+                </div>
+                <button
+                  onClick={startStudySession}
+                  disabled={isStudyTimerRunning}
+                  className="shrink-0 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-md transition active:scale-95 disabled:cursor-default disabled:bg-stone-400"
+                >
+                  {isStudyTimerRunning ? '学習中…' : studySeconds >= 600 ? 'もう一度' : studySeconds > 0 ? '再開する' : '10分スタート'}
+                </button>
+              </div>
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-white shadow-inner">
+                <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-sky-500 transition-all" style={{ width: `${Math.min((studySeconds / 600) * 100, 100)}%` }} />
+              </div>
+            </div>
             
             <div className="flex justify-between items-center mb-6">
               <button 
@@ -204,20 +286,23 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                 <div className="flex items-center justify-between w-full mt-4">
                   {/* ◀ 前へ */}
                   <button 
-                    onClick={() => setSelectedIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
+                    onClick={() => {
+                      setSelectedIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
+                      setIsAnswerRevealed(false);
+                    }}
                     disabled={selectedIndex === 0}
                     className={`text-6xl transition-all p-4 ${selectedIndex === 0 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
                   >◀</button>
 
                   {/* 巨大な漢字と読み表示 */}
-                  <div className="text-center px-4 flex flex-col items-center animate-in zoom-in duration-300" key={selectedIndex}>
+                    <div className="text-center px-4 flex flex-col items-center animate-in zoom-in duration-300" key={selectedIndex}>
                     <div className="text-6xl mb-4">{filteredWords[selectedIndex].emoji}</div>
                     <h2 className="text-[8rem] sm:text-[10rem] font-black text-stone-800 leading-none mb-6 drop-shadow-md">
-                      {filteredWords[selectedIndex].kanji}
+                      {flashcardMode === 'hide_kanji' && !isAnswerRevealed ? '？' : filteredWords[selectedIndex].kanji}
                     </h2>
                     <div className="flex items-center gap-4 bg-sky-50 py-3 px-8 rounded-full border-4 border-sky-100 shadow-sm">
                       <p className="text-4xl sm:text-5xl font-black text-sky-700">
-                        {renderReading(filteredWords[selectedIndex].reading, filteredWords[selectedIndex].okurigana)}
+                        {flashcardMode === 'hide_reading' && !isAnswerRevealed ? '？？？' : renderReading(filteredWords[selectedIndex].reading, filteredWords[selectedIndex].okurigana)}
                       </p>
                       <button 
                         onClick={() => speakWord(getFullReading(filteredWords[selectedIndex].reading, filteredWords[selectedIndex].okurigana))} 
@@ -238,11 +323,38 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                          <p className="text-lg font-bold text-amber-900/80">{filteredWords[selectedIndex].origin_logic}</p>
                        </div>
                     )}
+                    {flashcardMode !== 'normal' && !isAnswerRevealed && (
+                      <button
+                        onClick={() => setIsAnswerRevealed(true)}
+                        className="mt-5 rounded-2xl bg-sky-600 px-8 py-3 text-sm font-black text-white shadow-md transition active:scale-95"
+                      >
+                        答えを見る
+                      </button>
+                    )}
+                    <div className="mt-6 grid w-full max-w-md grid-cols-2 gap-3">
+                      <button
+                        onClick={() => onSelfJudge?.(filteredWords[selectedIndex], false)}
+                        disabled={flashcardMode !== 'normal' && !isAnswerRevealed}
+                        className="rounded-2xl border-2 border-rose-200 bg-rose-50 px-4 py-4 text-sm font-black text-rose-600 transition active:scale-95 disabled:opacity-40"
+                      >
+                        まだ不安
+                      </button>
+                      <button
+                        onClick={() => onSelfJudge?.(filteredWords[selectedIndex], true)}
+                        disabled={flashcardMode !== 'normal' && !isAnswerRevealed}
+                        className="rounded-2xl border-2 border-emerald-500 bg-emerald-500 px-4 py-4 text-sm font-black text-white shadow-md transition active:scale-95 disabled:opacity-40"
+                      >
+                        覚えた！
+                      </button>
+                    </div>
                   </div>
 
                   {/* 次へ ▶ */}
                   <button 
-                    onClick={() => setSelectedIndex(prev => (prev !== null && prev < filteredWords.length - 1 ? prev + 1 : prev))}
+                    onClick={() => {
+                      setSelectedIndex(prev => (prev !== null && prev < filteredWords.length - 1 ? prev + 1 : prev));
+                      setIsAnswerRevealed(false);
+                    }}
                     disabled={selectedIndex === filteredWords.length - 1}
                     className={`text-6xl transition-all p-4 ${selectedIndex === filteredWords.length - 1 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
                   >▶</button>

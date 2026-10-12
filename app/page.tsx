@@ -201,16 +201,19 @@ export default function Home() {
     setLoading(false);
   }, [calendarDate, fetchMonthlyLogs, getFullReading]);
 
-  const fetchAllWordsForEdit = useCallback(async () => {
+  const fetchAllWordsForEdit = useCallback(async (targetUser: any = adminTargetUser) => {
     // ★修正: 1000件上限突破のため.limit(3000)を追加
-    const { data: words } = await supabase.from('kanji_questions').select('*').eq('target_user', adminTargetUser.db_target).order('id', { ascending: false }).limit(3000);
-    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', adminTargetUser.id).limit(3000);
+    const { data: words } = await supabase.from('kanji_questions').select('*').eq('target_user', targetUser.db_target).order('id', { ascending: false }).limit(3000);
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status, mistake_count').eq('user_id', targetUser.id).limit(3000);
     if (words) {
         const sMap = new Map();
-        progress?.forEach((p: any) => sMap.set(p.question_id, p.status));
-        setAllWordsList(words.map((w: any) => ({ ...w, currentStatus: sMap.get(w.id) || 'learning' })));
+        progress?.forEach((p: any) => sMap.set(p.question_id, p));
+        setAllWordsList(words.map((w: any) => {
+          const progressEntry = sMap.get(w.id);
+          return { ...w, currentStatus: progressEntry?.status || 'learning', mistakeCount: progressEntry?.mistake_count || 0 };
+        }));
     }
-  }, [adminTargetUser.db_target, adminTargetUser.id]);
+  }, [adminTargetUser,]);
 
   const saveChallengeSettings = useCallback(async (settings: any) => {
     setChallengeSettings(settings);
@@ -253,6 +256,41 @@ export default function Home() {
     if (error) alert("削除に失敗しました: " + error.message);
     else fetchAllWordsForEdit();
   }, [fetchAllWordsForEdit]);
+
+  const updateCollectionSelfJudge = useCallback(async (word: KanjiWord, remembered: boolean) => {
+    const status = remembered ? 'gold' : 'learning';
+    const mistakeCount = ((word as any).mistakeCount || 0) + (remembered ? 0 : 1);
+    setAllWordsList((prev) => prev.map((item) => item.id === word.id ? { ...item, currentStatus: status, mistakeCount } : item));
+    const { error } = await supabase.from('user_progress').upsert({
+      user_id: currentUser.id,
+      question_id: word.id,
+      status,
+      mistake_count: mistakeCount,
+      last_reviewed_at: new Date().toISOString()
+    }, { onConflict: 'user_id, question_id' });
+    if (error) alert('判定を保存できませんでした: ' + error.message);
+  }, [currentUser.id]);
+
+  const saveCollectionStudySession = useCallback(async () => {
+    const studySeconds = pendingTimeRef.current;
+    const collectionViews = pendingViewsRef.current;
+    pendingTimeRef.current = 0;
+    pendingViewsRef.current = 0;
+    if (studySeconds === 0 && collectionViews === 0) return;
+
+    const today = getTodayJST();
+    const { data: todayLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
+    const updates = {
+      study_time_seconds: (todayLog?.study_time_seconds || 0) + studySeconds,
+      collection_views: (todayLog?.collection_views || 0) + collectionViews
+    };
+    if (todayLog) {
+      await supabase.from('daily_logs').update(updates).eq('id', todayLog.id);
+    } else {
+      await supabase.from('daily_logs').insert([{ user_id: currentUser.id, date: today, count: 0, is_completed: false, streak: 0, ...updates }]);
+    }
+    setDailyProgress((prev: any) => ({ ...prev, date: today, ...updates }));
+  }, [currentUser.id]);
 
   const sendLineToChild = useCallback(async (msg: string) => {
     const res = await fetch('/api/line/send', { method: 'POST', body: JSON.stringify({ message: msg }) });
@@ -376,14 +414,20 @@ export default function Home() {
     
     setDailyProgress((prev: any) => ({ ...prev, ...lD })); 
 
-    const { data: pD } = await supabase.from('user_progress').select('status').eq('user_id', currentUser.id).eq('question_id', id).single();
+    const { data: pD } = await supabase.from('user_progress').select('status, mistake_count').eq('user_id', currentUser.id).eq('question_id', id).single();
     let ns = pD?.status || 'learning'; 
     if (correct) { 
         if (ns === 'learning') ns = 'bronze'; 
         else if (ns === 'bronze') ns = 'silver'; 
         else if (ns === 'silver') ns = 'gold'; 
     }
-    await supabase.from('user_progress').upsert({ user_id: currentUser.id, question_id: id, status: ns, last_reviewed_at: new Date().toISOString() }, { onConflict: 'user_id, question_id' });
+    await supabase.from('user_progress').upsert({
+      user_id: currentUser.id,
+      question_id: id,
+      status: ns,
+      mistake_count: (pD?.mistake_count || 0) + (correct ? 0 : 1),
+      last_reviewed_at: new Date().toISOString()
+    }, { onConflict: 'user_id, question_id' });
   };
 
   const checkAnswer = async (ans: string, isVoice: boolean = false) => {
@@ -666,11 +710,11 @@ export default function Home() {
   const navTo = (v: any) => { stopSpeaking(); setShowRick(false); setView(v); };
 
   // --- メインレンダリング ---
-  if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading}} />;
+  if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading}} />;
   
   if (view === 'admin') return <AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />;
   
-  if (view === 'collection') return <CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }}} />;
+  if (view === 'collection') return <CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onStudySessionComplete: saveCollectionStudySession}} />;
   
   if (view === 'game' || view === 'rick_challenge') return (
     <GameScreen 
