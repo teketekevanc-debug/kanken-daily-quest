@@ -175,7 +175,7 @@ export default function MenuScreen(props: MenuScreenProps) {
             : examMission.focus}
         </p>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {(examMission.categoryIds.length ? examMission.categoryIds : ['kyu6', 'exam_kyu6', 'idiom', 'synonym_antonym'])
+          {(examMission.categoryIds.length ? examMission.categoryIds : ['exam_kyu6', 'exam_kyu5', 'kyu4', 'idiom', 'synonym_antonym'])
             .map(id => CATEGORIES.find(category => category.id === id))
             .filter((category): category is (typeof CATEGORIES)[number] => Boolean(category))
             .map(category => (
