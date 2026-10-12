@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from "@/lib/supabaseClient";
 import confetti from 'canvas-confetti'
-import { USERS, MODE_NAMES, CATEGORIES } from '@/lib/constants'
+import { USERS, MODE_NAMES, CATEGORIES, getExamMissionPhase } from '@/lib/constants'
 import type { KanjiWord, ProgressStats } from '@/lib/constants'
 
 // コンポーネントのインポート
@@ -34,7 +34,7 @@ export default function Home() {
   // --- 基本ステート ---
   const [currentUser, setCurrentUser] = useState(defaultUser)
   const [view, setView] = useState<'menu'|'game'|'rick_challenge'|'result'|'admin'|'collection'>('menu')
-  const [mode, setMode] = useState<'daily'|'free'|'weekend'|'parent_challenge'|'rick_challenge'|'revenge'>('daily')
+  const [mode, setMode] = useState<'daily'|'free'|'weekend'|'parent_challenge'|'rick_challenge'|'revenge'|'mission_100'>('daily')
   const [loading, setLoading] = useState(false); 
   const [targetKyu, setTargetKyu] = useState<string>('kyu6')
   const [selectedInputMode, setSelectedInputMode] = useState<'quiz_kanji'|'typing_read'|'write_canvas'|'write_self'>('quiz_kanji')
@@ -86,7 +86,6 @@ export default function Home() {
   const studySecondsRef = useRef(0);
   const [studySeconds, setStudySeconds] = useState(0);
   const [isStudyTimerRunning, setIsStudyTimerRunning] = useState(false);
-  const [isKanjiCardVisible, setIsKanjiCardVisible] = useState(false);
 
   // --- 基本ヘルパー・音声 ---
   const stopSpeaking = useCallback(() => {
@@ -304,7 +303,7 @@ export default function Home() {
   }, [currentUser, fetchAllWordsForEdit, view]);
 
   useEffect(() => {
-    if (!isStudyTimerRunning || !isKanjiCardVisible) return;
+    if (!isStudyTimerRunning || view !== 'collection') return;
     const timer = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       const nextSeconds = Math.min(studySecondsRef.current + 1, 600);
@@ -317,7 +316,7 @@ export default function Home() {
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [isKanjiCardVisible, isStudyTimerRunning, saveCompletedStudyTimer]);
+  }, [isStudyTimerRunning, saveCompletedStudyTimer, view]);
 
   const sendLineToChild = useCallback(async (msg: string) => {
     const res = await fetch('/api/line/send', { method: 'POST', body: JSON.stringify({ message: msg }) });
@@ -351,16 +350,25 @@ export default function Home() {
     setOpenedChests([]); 
     setMistakeCount(0);
 
-    const limit = selectedMode === 'weekend' ? (challengeSettings.special_quest_count || 10) : (challengeSettings.quest_count || 5);
+    const examMission = getExamMissionPhase();
+    if (selectedMode === 'mission_100' && !examMission.isActive) {
+      alert(examMission.phase === 0
+        ? `100日特訓は10月24日開始です。あと${examMission.daysUntilStart}日準備しましょう！`
+        : '100日特訓期間は終了しました。入試本番に向けて頑張ってください！');
+      setLoading(false);
+      return;
+    }
+
+    const limit = selectedMode === 'mission_100' ? 10 : selectedMode === 'weekend' ? (challengeSettings.special_quest_count || 10) : (challengeSettings.quest_count || 5);
     setCurrentGameGoal(limit);
     
     // ★修正: 上限に引っかからないように.limit(3000)を追加
     let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
-    if (targetKyu !== 'all') {
+    if (selectedMode !== 'mission_100' && targetKyu !== 'all') {
       query = query.eq('kanji_level', targetKyu);
     }
     const { data: allW } = await query;
-    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id).limit(3000);
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status, mistake_count').eq('user_id', currentUser.id).limit(3000);
 
     if (!allW?.length) { 
         alert(`選んだ級（${targetKyu}）の単語がまだないワン！🐶`);
@@ -371,7 +379,27 @@ export default function Home() {
     setCachedAllWords(allW);
 
     let queue;
-    if (selectedMode === 'daily') {
+    if (selectedMode === 'mission_100') {
+      const phaseWords = allW.filter((word) => examMission.categoryIds.includes(word.kanji_level));
+      const missionWords = phaseWords.length > 0 ? phaseWords : allW;
+      const progressMap = new Map(progress?.map((entry) => [entry.question_id, entry]));
+      const statusOrder: Record<string, number> = { learning: 0, bronze: 1, silver: 2, gold: 3 };
+      queue = [...missionWords].sort((a, b) => {
+        const progressA = progressMap.get(a.id);
+        const progressB = progressMap.get(b.id);
+        if (examMission.phase === 3) {
+          const missionPriorityA = a.kanji_level === 'mission_100' ? 0 : 1;
+          const missionPriorityB = b.kanji_level === 'mission_100' ? 0 : 1;
+          if (missionPriorityA !== missionPriorityB) return missionPriorityA - missionPriorityB;
+        }
+        const mistakesA = progressA?.mistake_count || 0;
+        const mistakesB = progressB?.mistake_count || 0;
+        if (examMission.phase === 3 && mistakesA !== mistakesB) return mistakesB - mistakesA;
+        const rankA = statusOrder[progressA?.status || 'learning'];
+        const rankB = statusOrder[progressB?.status || 'learning'];
+        return rankA === rankB ? 0.5 - Math.random() : rankA - rankB;
+      }).slice(0, Math.min(limit, missionWords.length));
+    } else if (selectedMode === 'daily') {
       const statusMap = new Map(progress?.map(p => [p.question_id, p.status]));
       // ★修正: 未学習(learning)が最初(0)に選ばれるよう優先順位を是正
       const statusOrder: Record<string, number> = { learning: 0, bronze: 1, silver: 2, gold: 3 };
@@ -740,7 +768,7 @@ export default function Home() {
     <StudyTimerPanel
       elapsedSeconds={studySeconds}
       isRunning={isStudyTimerRunning}
-      isKanjiVisible={isKanjiCardVisible}
+      isStudyAreaActive={view === 'collection'}
       onStart={startStudyTimer}
       onPause={() => setIsStudyTimerRunning(false)}
     />
@@ -748,18 +776,16 @@ export default function Home() {
   const withGlobalTimer = (screen: React.ReactNode) => (
     <>
       {screen}
-      <div className="fixed inset-x-3 bottom-3 z-40 mx-auto w-full max-w-md">
-        {studyTimerPanel}
-      </div>
+      {studyTimerPanel}
     </>
   );
 
   // --- メインレンダリング ---
-  if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, studyTimerPanel}} />;
+  if (view === 'menu') return withGlobalTimer(<MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission: getExamMissionPhase()}} />);
   
   if (view === 'admin') return withGlobalTimer(<AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />);
   
-  if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onKanjiVisibilityChange: setIsKanjiCardVisible}} />);
+  if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge}} />);
   
   if (view === 'game' || view === 'rick_challenge') return withGlobalTimer(
     <GameScreen 

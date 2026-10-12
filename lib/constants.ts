@@ -89,6 +89,8 @@ export const USERS = [
 // 受験対策・分野別の教材カテゴリ
 export const CATEGORIES = [
   { id: 'kyu4', name: '4級(中学受験・頻出)' },
+  { id: 'exam_kyu5', name: '5級(中学受験・頻出)' },
+  { id: 'exam_kyu6', name: '6級(中学受験・頻出)' },
   { id: 'idiom', name: '四字熟語・慣用句' },
   { id: 'synonym_antonym', name: '対義語・類義語' },
   { id: 'grammar', name: '言葉の知識・文法' },
@@ -96,8 +98,6 @@ export const CATEGORIES = [
   { id: 'mission_100', name: '合格への100日特訓' },
   { id: 'kyu6', name: '小学5年相当' },
   { id: 'kyu5', name: '小学6年相当' },
-  { id: 'exam_kyu6', name: '🔥受験頻出漢字（基礎）' },
-  { id: 'exam_kyu5', name: '🔥受験頻出漢字（発展）' },
   { id: 'kyu10', name: '10級 (小1)' },
   { id: 'kyu9', name: '9級 (小2)' },
   { id: 'kyu8', name: '8級 (小3)' },
@@ -105,13 +105,78 @@ export const CATEGORIES = [
   { id: 'general', name: '一般・中学以上' }
 ];
 
+export type ExamMissionPhase = {
+  phase: 0 | 1 | 2 | 3 | 4;
+  dayNumber: number;
+  daysUntilStart: number;
+  daysUntilExam: number;
+  title: string;
+  focus: string;
+  period: string;
+  categoryIds: string[];
+  isActive: boolean;
+};
+
+// 100日計画: 基礎30日、文章活用30日、本番演習40日。試験日は2027-02-01。
+export const getExamMissionPhase = (date = new Date()): ExamMissionPhase => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date);
+  const getPart = (type: string) => Number(parts.find(part => part.type === type)?.value);
+  const todayUtc = Date.UTC(getPart('year'), getPart('month') - 1, getPart('day'));
+  const startUtc = Date.UTC(2026, 9, 24);
+  const examUtc = Date.UTC(2027, 1, 1);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const daysUntilExam = Math.max(0, Math.ceil((examUtc - todayUtc) / dayMs));
+  const daysUntilStart = Math.max(0, Math.ceil((startUtc - todayUtc) / dayMs));
+  const dayNumber = Math.floor((todayUtc - startUtc) / dayMs) + 1;
+
+  if (todayUtc < startUtc) {
+    return {
+      phase: 0, dayNumber: 0, daysUntilStart, daysUntilExam,
+      title: '準備期間', focus: '教材をそろえ、朝10分カードを習慣にする',
+      period: '10月24日スタート', categoryIds: [], isActive: false
+    };
+  }
+  if (todayUtc >= examUtc) {
+    return {
+      phase: 4, dayNumber: 100, daysUntilStart: 0, daysUntilExam,
+      title: '本番日', focus: '多摩大目黒（特待）・桐光学園 入試本番',
+      period: '2月1日', categoryIds: [], isActive: false
+    };
+  }
+  if (dayNumber <= 30) {
+    return {
+      phase: 1, dayNumber, daysUntilStart: 0, daysUntilExam,
+      title: '基礎を固める', focus: '漢字・語句の意味を正確に覚える',
+      period: '10月24日〜11月22日',
+      categoryIds: ['kyu6', 'exam_kyu6', 'kyu5', 'idiom', 'synonym_antonym'], isActive: true
+    };
+  }
+  if (dayNumber <= 60) {
+    return {
+      phase: 2, dayNumber, daysUntilStart: 0, daysUntilExam,
+      title: '文章の中で使う', focus: '文脈・文法・語句の使い分けを練習する',
+      period: '11月23日〜12月22日',
+      categoryIds: ['kyu5', 'kyu4', 'exam_kyu5', 'idiom', 'synonym_antonym', 'grammar', 'loanword_emotion'], isActive: true
+    };
+  }
+  return {
+    phase: 3, dayNumber: Math.min(dayNumber, 100), daysUntilStart: 0, daysUntilExam,
+    title: '得点力を仕上げる', focus: '頻出問題・苦手分野を時間内に解き、正答を安定させる',
+    period: '12月23日〜1月31日',
+    categoryIds: ['mission_100', 'kyu4', 'exam_kyu5', 'idiom', 'synonym_antonym', 'grammar', 'loanword_emotion', 'exam_kyu6'], isActive: true
+  };
+};
+
 export const MODE_NAMES: Record<string, string> = {
   daily: '毎日の冒険',
   free: 'フリー練習',
   weekend: '週末ボス',
   parent_challenge: 'パパからの挑戦',
   rick_challenge: 'Rickの特訓',
-  revenge: 'リベンジ'
+  revenge: 'リベンジ',
+  mission_100: '合格への100日特訓'
 };
 
 // --- ヘルパー関数 ---

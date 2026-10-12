@@ -3,7 +3,7 @@
 type StudyTimerPanelProps = {
   elapsedSeconds: number;
   isRunning: boolean;
-  isKanjiVisible: boolean;
+  isStudyAreaActive: boolean;
   onStart: () => void;
   onPause: () => void;
 };
@@ -11,43 +11,27 @@ type StudyTimerPanelProps = {
 export default function StudyTimerPanel({
   elapsedSeconds,
   isRunning,
-  isKanjiVisible,
+  isStudyAreaActive,
   onStart,
   onPause,
 }: StudyTimerPanelProps) {
-  const remainingSeconds = Math.max(0, 600 - elapsedSeconds);
-  const minutes = Math.floor(remainingSeconds / 60);
-  const seconds = remainingSeconds % 60;
   const isComplete = elapsedSeconds >= 600;
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
 
   return (
-    <section className="w-full rounded-3xl border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 to-sky-50 p-4 shadow-lg">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-black tracking-widest text-emerald-700">☀️ 朝の10分カード</p>
-          <p className="mt-1 text-sm font-bold text-stone-600">
-            {isComplete
-              ? '今日の10分完了！よく頑張りました。'
-              : isRunning && isKanjiVisible
-                ? `漢字を見ながら学習中 · あと ${minutes}分 ${String(seconds).padStart(2, '0')}秒`
-                : isRunning
-                  ? `カードを開くと計測 · あと ${minutes}分 ${String(seconds).padStart(2, '0')}秒`
-                  : `目標まで ${minutes}分 ${String(seconds).padStart(2, '0')}秒`}
-          </p>
-        </div>
+    <div className="fixed right-3 top-3 z-60 flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white/95 py-1.5 pl-2.5 pr-1.5 shadow-md backdrop-blur-sm" title="合格への朝10分カード">
+      <span className={`h-2 w-2 rounded-full ${isComplete ? 'bg-amber-400' : isRunning && isStudyAreaActive ? 'bg-emerald-500 animate-pulse' : 'bg-stone-300'}`} />
+      <span className="min-w-14 text-center font-mono text-sm font-black tabular-nums text-stone-700" aria-live="polite">
+        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+      </span>
         <button
           onClick={isRunning ? onPause : onStart}
-          className="shrink-0 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-md transition active:scale-95"
+          aria-label={isRunning ? '10分タイマーを一時停止' : isComplete ? '10分タイマーをリセットして開始' : '10分タイマーを開始'}
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-black text-white transition active:scale-90"
         >
-          {isRunning ? '一時停止' : isComplete ? 'もう一度' : elapsedSeconds > 0 ? '再開する' : '10分スタート'}
+          {isRunning ? 'Ⅱ' : isComplete ? '↻' : '▶'}
         </button>
-      </div>
-      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white shadow-inner">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-sky-500 transition-all"
-          style={{ width: `${Math.min((elapsedSeconds / 600) * 100, 100)}%` }}
-        />
-      </div>
-    </section>
+    </div>
   );
 }

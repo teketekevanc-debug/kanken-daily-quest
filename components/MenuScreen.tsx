@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { supabase } from "@/lib/supabaseClient"
 import { USERS, CATEGORIES, MODE_NAMES, getUserFirstName, getDailyMessage } from '@/lib/constants'
+import type { ExamMissionPhase } from '@/lib/constants'
 
 type MenuScreenProps = {
   currentUser: any;
@@ -26,7 +27,7 @@ type MenuScreenProps = {
   fetchAdminStats: (user: any) => void;
   setAdminTargetUser: (user: any) => void;
   renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
-  studyTimerPanel: React.ReactNode;
+  examMission: ExamMissionPhase;
 }
 
 export default function MenuScreen(props: MenuScreenProps) {
@@ -35,7 +36,7 @@ export default function MenuScreen(props: MenuScreenProps) {
     targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode,
     rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal,
     hasParentChallenge, startGame, setView, fetchCollection, renderCalendar,
-    stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, studyTimerPanel
+    stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission
   } = props;
 
   const [showTipsModal, setShowTipsModal] = useState(false);
@@ -128,7 +129,7 @@ export default function MenuScreen(props: MenuScreenProps) {
   return (
     <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans transition-colors duration-500`}>
       
-      <div className="absolute top-4 right-4 flex flex-wrap justify-end gap-2 max-w-[70%]">
+      <div className="absolute top-4 left-4 flex flex-wrap justify-start gap-2 max-w-[55%]">
         {USERS.map((u: any) => (
           <button key={u.id} onClick={() => setCurrentUser(u)} className={`px-3 py-1.5 rounded-full text-xs font-black transition-all shadow-sm ${currentUser.id === u.id ? `bg-gradient-to-r ${u.hue} text-white scale-110 ring-2 ring-white/50` : 'bg-white/50 text-stone-500 opacity-90 hover:bg-white'}`}>
             {getUserFirstName(u.name)}
@@ -156,9 +157,40 @@ export default function MenuScreen(props: MenuScreenProps) {
         <div className="text-5xl relative z-10 drop-shadow-md animate-bounce">📝</div>
       </div>
 
-      <div className="w-full max-w-sm mb-6">
-        {studyTimerPanel}
-      </div>
+      <section className="mb-5 w-full max-w-sm rounded-3xl border-2 border-indigo-200 bg-white p-4 shadow-md">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black tracking-widest text-indigo-500">🎯 多摩大目黒（特待）・桐光学園</p>
+            <h2 className="mt-1 text-lg font-black text-indigo-900">
+              {examMission.phase === 0 ? '100日合格ロードマップ' : examMission.phase === 4 ? '今日は入試本番' : `第${examMission.phase}期 · ${examMission.title}`}
+            </h2>
+          </div>
+          {examMission.phase > 0 && examMission.phase < 4 && (
+            <span className="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-xs font-black text-indigo-700">DAY {examMission.dayNumber}/100</span>
+          )}
+        </div>
+        <p className="mt-2 text-xs font-bold leading-relaxed text-stone-600">
+          {examMission.phase === 0
+            ? `10月24日開始 · あと${examMission.daysUntilStart}日。${examMission.focus}`
+            : examMission.focus}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {(examMission.categoryIds.length ? examMission.categoryIds : ['kyu6', 'exam_kyu6', 'idiom', 'synonym_antonym'])
+            .map(id => CATEGORIES.find(category => category.id === id))
+            .filter((category): category is (typeof CATEGORIES)[number] => Boolean(category))
+            .map(category => (
+              <span key={category.id} className="rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-bold text-indigo-700">{category.name}</span>
+            ))}
+        </div>
+        <p className="mt-2 text-right text-[9px] font-bold text-stone-400">{examMission.period} · 毎日10問を目安に特訓</p>
+        <button
+          onClick={() => startGame('mission_100')}
+          disabled={!examMission.isActive}
+          className="mt-3 w-full rounded-2xl bg-indigo-600 py-3 text-sm font-black text-white shadow-md transition active:scale-95 disabled:cursor-not-allowed disabled:bg-stone-300"
+        >
+          {examMission.phase === 0 ? `特訓開始まであと${examMission.daysUntilStart}日` : examMission.phase === 4 ? '100日特訓期間終了' : '今日の合格ミッションを始める'}
+        </button>
+      </section>
 
       <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">
           <div className="flex items-center justify-between mb-3">

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { CATEGORIES } from '@/lib/constants';
 import type { ChallengeSettings, KanjiWord } from '@/lib/constants';
 
@@ -20,14 +20,13 @@ type CollectionScreenProps = {
     stopSpeaking: () => void;
     onViewCard?: () => void;
     onSelfJudge?: (word: CollectionWord, remembered: boolean) => void;
-    onKanjiVisibilityChange?: (isVisible: boolean) => void;
 };
 
 export default function CollectionScreen(props: CollectionScreenProps) {
     const { 
         currentUser, setView, allWordsList, challengeSettings, 
         speakWord, renderReading, getFullReading, stopSpeaking, onViewCard,
-        onSelfJudge, onKanjiVisibilityChange
+        onSelfJudge
     } = props;
     
     const [mainTab, setMainTab] = useState<'words'|'tips'>('words');
@@ -78,11 +77,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             return true;
         });
     }, [allWordsList, selectedCategory, searchQuery]);
-
-    useEffect(() => {
-      onKanjiVisibilityChange?.(selectedIndex !== null && mainTab === 'words' && selectedCategory !== null);
-      return () => onKanjiVisibilityChange?.(false);
-    }, [mainTab, onKanjiVisibilityChange, selectedCategory, selectedIndex]);
 
     // グリッドのタップ時の挙動（クイズ表示を解除 ＆ フラッシュカードを開く）
     const handleCardClick = (w: CollectionWord, index: number) => {
