@@ -88,10 +88,10 @@ export const USERS = [
 
 // ★ 6級・5級を優先するよう並べ替えました
 export const CATEGORIES = [
-  { id: 'kyu6', name: '6級 (小5)' },
-  { id: 'kyu5', name: '5級 (小6)' },
-  { id: 'exam_kyu6', name: '🔥漢検6級 過去問対策' },
-  { id: 'exam_kyu5', name: '🔥漢検5級 過去問対策' },
+  { id: 'kyu6', name: '小学5年相当' },
+  { id: 'kyu5', name: '小学6年相当' },
+  { id: 'exam_kyu6', name: '🔥受験頻出漢字（基礎）' },
+  { id: 'exam_kyu5', name: '🔥受験頻出漢字（発展）' },
   { id: 'kyu10', name: '10級 (小1)' },
   { id: 'kyu9', name: '9級 (小2)' },
   { id: 'kyu8', name: '8級 (小3)' },

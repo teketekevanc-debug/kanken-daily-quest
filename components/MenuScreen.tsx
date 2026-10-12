@@ -116,13 +116,13 @@ export default function MenuScreen(props: MenuScreenProps) {
   const displayCountData = [challengeSettings?.quest_count || 5];
   const [displayCount] = displayCountData;
 
-  // ★ 漢検試験日（6月21日）までのカウントダウン計算
+  // 受験日（2027年2月1日）までのカウントダウン
   const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
   const today = getJSTDate();
   today.setHours(0, 0, 0, 0);
-  const examDay = new Date('2026-06-21T00:00:00+09:00');
-  const diffTime = examDay.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const examDayUtc = Date.UTC(2027, 1, 1);
+  const diffDays = Math.ceil((examDayUtc - todayUtc) / (1000 * 60 * 60 * 24));
 
   return (
     <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans transition-colors duration-500`}>
@@ -139,13 +139,13 @@ export default function MenuScreen(props: MenuScreenProps) {
         <img src="/Rick.png" alt="Rick" className="w-full h-full object-cover" />
         <div className="absolute bottom-0 left-0 right-0 bg-stone-900/40 text-white text-[10px] text-center font-bold py-0.5 backdrop-blur-sm tracking-widest">ナビゲーター</div>
       </div>
-      <h1 className={`text-3xl font-black ${currentUser.text} mb-2 tracking-widest drop-shadow-sm`}>毎日漢検クエスト</h1>
+      <h1 className={`text-3xl font-black ${currentUser.text} mb-2 tracking-widest drop-shadow-sm`}>毎日受験クエスト</h1>
       
-      {/* 漢検カウントダウン */}
+      {/* 受験カウントダウン */}
       <div className="w-full max-w-sm bg-gradient-to-r from-rose-50 to-orange-50 border-4 border-rose-200 p-4 rounded-3xl shadow-sm mb-4 flex items-center justify-between relative overflow-hidden">
         <div className="absolute -right-4 -bottom-4 text-7xl opacity-20">🔥</div>
         <div className="relative z-10">
-          <p className="text-[11px] font-black text-rose-500 mb-1 tracking-widest">漢検試験 (6月21日) まで</p>
+          <p className="text-[11px] font-black text-rose-500 mb-1 tracking-widest">受験本番（2027年2月1日）まで</p>
           <div className="flex items-baseline gap-1">
             <span className="text-xl font-black text-rose-600">あと</span>
             <span className="text-5xl font-black text-rose-600 drop-shadow-sm">{Math.max(0, diffDays)}</span>
@@ -302,7 +302,7 @@ export default function MenuScreen(props: MenuScreenProps) {
         <button onClick={() => startGame('revenge')} className="w-full py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-stone-800 text-rose-400 border-b-4 border-stone-900 hover:bg-stone-700 active:translate-y-1 active:border-b-0 tracking-widest gap-2"><span className="text-xl">💀</span> リベンジ (無限復習)</button>
 
         <div className="flex space-x-3 mt-4">
-          <button onClick={fetchCollection} className="flex-1 bg-white border-b-4 border-emerald-500 text-emerald-600 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">📖</span> 図鑑</button>
+          <button onClick={fetchCollection} className="flex-1 bg-white border-b-4 border-emerald-500 text-emerald-600 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">📖</span> 朝10分カード</button>
           <button onClick={() => startGame('free')} className="flex-1 bg-white border-b-4 border-sky-400 text-sky-500 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">⚔️</span> フリー</button>
         </div>
       </div>
