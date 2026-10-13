@@ -20,7 +20,7 @@ export default function StudyTimerPanel({
   const seconds = elapsedSeconds % 60;
 
   return (
-    <div className="fixed right-3 top-3 z-60 flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white/95 py-1.5 pl-2.5 pr-1.5 shadow-md backdrop-blur-sm" title="合格への朝10分カード">
+    <div className="fixed right-3 top-3 z-60 flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white/95 py-1.5 pl-2.5 pr-1.5 shadow-md backdrop-blur-sm" title="1日10分学習タイマー">
       <span className={`h-2 w-2 rounded-full ${isComplete ? 'bg-amber-400' : isRunning && isStudyAreaActive ? 'bg-emerald-500 animate-pulse' : 'bg-stone-300'}`} />
       <span className="min-w-14 text-center font-mono text-sm font-black tabular-nums text-stone-700" aria-live="polite">
         {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}

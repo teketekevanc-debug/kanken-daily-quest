@@ -40,6 +40,7 @@ export default function MenuScreen(props: MenuScreenProps) {
   } = props;
 
   const [showTipsModal, setShowTipsModal] = useState(false);
+  const [tipSearchQuery, setTipSearchQuery] = useState('');
   
   // ★ 漢字リストモーダル用のステート
   const [showKanjiList, setShowKanjiList] = useState(false);
@@ -104,6 +105,9 @@ export default function MenuScreen(props: MenuScreenProps) {
 
   const tipsData = [challengeSettings?.unlocked_tips || []];
   const [unlockedTips] = tipsData;
+  const filteredUnlockedTips = unlockedTips
+    .map((tip: string, index: number) => ({ tip, index }))
+    .filter(({ tip }: { tip: string; index: number }) => tip.toLocaleLowerCase().includes(tipSearchQuery.trim().toLocaleLowerCase()));
   
   const remainder = streak % goal;
   const daysUntil = (remainder === 0 && streak > 0) ? goal : goal - remainder;
@@ -142,6 +146,13 @@ export default function MenuScreen(props: MenuScreenProps) {
         <div className="absolute bottom-0 left-0 right-0 bg-stone-900/40 text-white text-[10px] text-center font-bold py-0.5 backdrop-blur-sm tracking-widest">ナビゲーター</div>
       </div>
       <h1 className={`text-3xl font-black ${currentUser.text} mb-2 tracking-widest drop-shadow-sm`}>毎日受験クエスト</h1>
+
+      <button
+        onClick={fetchCollection}
+        className="mb-5 w-full max-w-sm rounded-2xl border-b-4 border-emerald-600 bg-emerald-500 px-5 py-4 text-base font-black text-white shadow-md transition active:translate-y-1 active:border-b-0 flex items-center justify-center gap-2"
+      >
+        <span className="text-xl">📖</span> 1日10分カード
+      </button>
       
       {/* 受験カウントダウン */}
       <div className="w-full max-w-sm bg-gradient-to-r from-rose-50 to-orange-50 border-4 border-rose-200 p-4 rounded-3xl shadow-sm mb-4 flex items-center justify-between relative overflow-hidden">
@@ -171,7 +182,7 @@ export default function MenuScreen(props: MenuScreenProps) {
         </div>
         <p className="mt-2 text-xs font-bold leading-relaxed text-stone-600">
           {examMission.phase === 0
-            ? `10月24日開始 · あと${examMission.daysUntilStart}日。${examMission.focus}`
+            ? `${examMission.period} · あと${examMission.daysUntilStart}日。${examMission.focus}`
             : examMission.focus}
         </p>
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -338,10 +349,7 @@ export default function MenuScreen(props: MenuScreenProps) {
 
         <button onClick={() => startGame('revenge')} className="w-full py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-stone-800 text-rose-400 border-b-4 border-stone-900 hover:bg-stone-700 active:translate-y-1 active:border-b-0 tracking-widest gap-2"><span className="text-xl">💀</span> リベンジ (無限復習)</button>
 
-        <div className="flex space-x-3 mt-4">
-          <button onClick={fetchCollection} className="flex-1 bg-white border-b-4 border-emerald-500 text-emerald-600 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">📖</span> 朝10分カード</button>
-          <button onClick={() => startGame('free')} className="flex-1 bg-white border-b-4 border-sky-400 text-sky-500 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">⚔️</span> フリー</button>
-        </div>
+        <button onClick={() => startGame('free')} className="mt-4 w-full bg-white border-b-4 border-sky-400 text-sky-500 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">⚔️</span> フリー</button>
       </div>
 
       <div className="mb-6 w-full max-w-sm">{renderCalendar()}</div>
@@ -432,15 +440,33 @@ export default function MenuScreen(props: MenuScreenProps) {
             <div className="bg-yellow-50 p-6 text-center border-b-4 border-yellow-100 shrink-0">
               <h3 className="text-2xl font-black text-yellow-600 flex items-center justify-center gap-2"><span>📚</span> 秘密の豆知識ノート</h3>
               <p className="text-xs font-bold text-yellow-700 mt-2">今まで集めた知識：{unlockedTips.length}個</p>
+              <input
+                type="search"
+                value={tipSearchQuery}
+                onChange={(event) => setTipSearchQuery(event.target.value)}
+                placeholder="キーワードで検索..."
+                aria-label="豆知識を検索"
+                className="mt-4 w-full rounded-xl border border-yellow-200 bg-white px-4 py-3 text-base font-bold text-stone-700 outline-none focus:border-yellow-400"
+              />
+              <p className="mt-2 text-left text-xs font-bold text-yellow-800">{filteredUnlockedTips.length}件を表示</p>
             </div>
             
             <div className="p-6 overflow-y-auto bg-stone-50 flex-1 space-y-3 no-scrollbar">
-              {unlockedTips.length > 0 ? (
-                unlockedTips.map((tip: string, i: number) => (
-                  <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-stone-100">
-                    <p className="text-sm font-bold text-stone-700 leading-relaxed">{tip}</p>
-                  </div>
+              {filteredUnlockedTips.length > 0 ? (
+                filteredUnlockedTips.map(({ tip, index }: { tip: string; index: number }) => (
+                  <article key={`${index}-${tip}`} className="bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
+                    <div className="flex items-start gap-3">
+                      <span className="shrink-0 text-xl" aria-hidden="true">📜</span>
+                      <p className="min-w-0 flex-1 break-words text-sm font-bold text-stone-700 leading-relaxed">{tip}</p>
+                    </div>
+                    <p className="mt-2 text-right text-[10px] font-black text-stone-400">豆知識 #{index + 1}</p>
+                  </article>
                 ))
+              ) : unlockedTips.length > 0 ? (
+                <div className="py-10 text-center">
+                  <p className="text-3xl mb-3">🔎</p>
+                  <p className="font-bold text-stone-500">一致する豆知識がありません</p>
+                </div>
               ) : (
                 <div className="text-center py-10">
                   <p className="text-4xl mb-4">🔒</p>

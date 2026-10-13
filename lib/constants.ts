@@ -80,7 +80,7 @@ export type ProgressStats = {
 // --- 定数データ ---
 
 export const USERS = [
-  { id: 'brother', db_target: 'brother', name: 'たくま (小6)', color: 'bg-amber-600', light: 'bg-amber-50', border: 'border-amber-600', text: 'text-amber-700', hue: 'from-amber-500 to-orange-600', defaultTipTable: 'minecraft_tips' },
+  { id: 'brother', db_target: 'brother', name: 'たくま (小6)', color: 'bg-amber-600', light: 'bg-amber-50', border: 'border-amber-600', text: 'text-amber-700', hue: 'from-amber-500 to-orange-600', defaultTipTable: 'splatoon_tips' },
   { id: 'sister', db_target: 'sister', name: 'みのり (小4)', color: 'bg-sky-500', light: 'bg-sky-50', border: 'border-sky-500', text: 'text-sky-700', hue: 'from-sky-400 to-indigo-500', defaultTipTable: 'school_tips' },
   { id: 'mami', db_target: 'parent', name: 'まみ', color: 'bg-pink-500', light: 'bg-pink-50', border: 'border-pink-500', text: 'text-pink-700', hue: 'from-pink-400 to-rose-500', defaultTipTable: 'school_tips' },
   { id: 'kenta', db_target: 'parent', name: 'けんた', color: 'bg-emerald-500', light: 'bg-emerald-50', border: 'border-emerald-500', text: 'text-emerald-700', hue: 'from-emerald-400 to-teal-500', defaultTipTable: 'minecraft_tips' }
@@ -117,14 +117,14 @@ export type ExamMissionPhase = {
   isActive: boolean;
 };
 
-// 100日計画: 基礎30日、文章活用30日、本番演習40日。試験日は2027-02-01。
+// 特訓計画: 基礎30日、文章活用30日、本番まで仕上げる。試験日は2027-02-01。
 export const getExamMissionPhase = (date = new Date()): ExamMissionPhase => {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit'
   }).formatToParts(date);
   const getPart = (type: string) => Number(parts.find(part => part.type === type)?.value);
   const todayUtc = Date.UTC(getPart('year'), getPart('month') - 1, getPart('day'));
-  const startUtc = Date.UTC(2026, 9, 24);
+  const startUtc = Date.UTC(2026, 9, 1);
   const examUtc = Date.UTC(2027, 1, 1);
   const dayMs = 24 * 60 * 60 * 1000;
   const daysUntilExam = Math.max(0, Math.ceil((examUtc - todayUtc) / dayMs));
@@ -134,8 +134,8 @@ export const getExamMissionPhase = (date = new Date()): ExamMissionPhase => {
   if (todayUtc < startUtc) {
     return {
       phase: 0, dayNumber: 0, daysUntilStart, daysUntilExam,
-      title: '準備期間', focus: '教材をそろえ、朝10分カードを習慣にする',
-      period: '10月24日スタート', categoryIds: [], isActive: false
+      title: '準備期間', focus: '教材をそろえ、1日10分カードを習慣にする',
+      period: '10月1日スタート', categoryIds: [], isActive: false
     };
   }
   if (todayUtc >= examUtc) {
@@ -149,7 +149,7 @@ export const getExamMissionPhase = (date = new Date()): ExamMissionPhase => {
     return {
       phase: 1, dayNumber, daysUntilStart: 0, daysUntilExam,
       title: '基礎を固める', focus: '漢字・語句の意味を正確に覚える',
-      period: '10月24日〜11月22日',
+      period: '10月1日〜10月30日',
       categoryIds: ['kyu6', 'exam_kyu6', 'kyu5', 'idiom', 'synonym_antonym'], isActive: true
     };
   }
@@ -157,14 +157,14 @@ export const getExamMissionPhase = (date = new Date()): ExamMissionPhase => {
     return {
       phase: 2, dayNumber, daysUntilStart: 0, daysUntilExam,
       title: '文章の中で使う', focus: '文脈・文法・語句の使い分けを練習する',
-      period: '11月23日〜12月22日',
+      period: '10月31日〜11月29日',
       categoryIds: ['kyu5', 'kyu4', 'exam_kyu5', 'idiom', 'synonym_antonym', 'grammar', 'loanword_emotion'], isActive: true
     };
   }
   return {
     phase: 3, dayNumber: Math.min(dayNumber, 100), daysUntilStart: 0, daysUntilExam,
     title: '得点力を仕上げる', focus: '頻出問題・苦手分野を時間内に解き、正答を安定させる',
-    period: '12月23日〜1月31日',
+    period: '11月30日〜1月31日',
     categoryIds: ['mission_100', 'kyu4', 'exam_kyu5', 'idiom', 'synonym_antonym', 'grammar', 'loanword_emotion', 'exam_kyu6'], isActive: true
   };
 };

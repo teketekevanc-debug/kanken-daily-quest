@@ -275,6 +275,80 @@ export default function Home() {
     if (error) alert('判定を保存できませんでした: ' + error.message);
   }, [currentUser.id]);
 
+  const registerCollectionMistake = useCallback(async ({ kanji, reading, note }: { kanji: string; reading: string; note: string }) => {
+    const normalizedKanji = kanji.trim();
+    const normalizedReading = reading.trim();
+    if (!normalizedKanji || !normalizedReading) return false;
+
+    const { data: existingWord, error: lookupError } = await supabase
+      .from('kanji_questions')
+      .select('id')
+      .eq('target_user', currentUser.db_target)
+      .eq('kanji', normalizedKanji)
+      .order('id', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (lookupError) {
+      alert('漢字を確認できませんでした: ' + lookupError.message);
+      return false;
+    }
+
+    let questionId = existingWord?.id;
+    if (!questionId) {
+      const { data: insertedWord, error: insertError } = await supabase
+        .from('kanji_questions')
+        .insert({
+          target_user: currentUser.db_target,
+          kanji: normalizedKanji,
+          reading: normalizedReading,
+          okurigana: '',
+          sentence: '',
+          emoji: '📝',
+          category: 'mistakes',
+          kanji_level: 'mistakes',
+          usage_example: note.trim() || null,
+          origin_logic: null
+        })
+        .select('id')
+        .single();
+
+      if (insertError || !insertedWord) {
+        alert('漢字を登録できませんでした: ' + (insertError?.message || '登録内容を確認してください'));
+        return false;
+      }
+      questionId = insertedWord.id;
+    }
+
+    const { data: existingProgress, error: progressLookupError } = await supabase
+      .from('user_progress')
+      .select('mistake_count')
+      .eq('user_id', currentUser.id)
+      .eq('question_id', questionId)
+      .maybeSingle();
+
+    if (progressLookupError) {
+      alert('間違いの記録を確認できませんでした: ' + progressLookupError.message);
+      return false;
+    }
+
+    const { error: progressError } = await supabase.from('user_progress').upsert({
+      user_id: currentUser.id,
+      question_id: questionId,
+      status: 'learning',
+      mistake_count: (existingProgress?.mistake_count || 0) + 1,
+      last_reviewed_at: new Date().toISOString()
+    }, { onConflict: 'user_id, question_id' });
+
+    if (progressError) {
+      alert('間違いを記録できませんでした: ' + progressError.message);
+      return false;
+    }
+
+    await fetchAllWordsForEdit(currentUser);
+    return true;
+  }, [currentUser, fetchAllWordsForEdit]);
+
   const saveCompletedStudyTimer = useCallback(async () => {
     const today = getTodayJST();
     const { data: todayLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
@@ -353,7 +427,7 @@ export default function Home() {
     const examMission = getExamMissionPhase();
     if (selectedMode === 'mission_100' && !examMission.isActive) {
       alert(examMission.phase === 0
-        ? `100日特訓は10月24日開始です。あと${examMission.daysUntilStart}日準備しましょう！`
+        ? `100日特訓は${examMission.period}です。あと${examMission.daysUntilStart}日準備しましょう！`
         : '100日特訓期間は終了しました。入試本番に向けて頑張ってください！');
       setLoading(false);
       return;
@@ -785,7 +859,7 @@ export default function Home() {
   
   if (view === 'admin') return withGlobalTimer(<AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />);
   
-  if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge}} />);
+  if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onRegisterMistake: registerCollectionMistake}} />);
   
   if (view === 'game' || view === 'rick_challenge') return withGlobalTimer(
     <GameScreen 

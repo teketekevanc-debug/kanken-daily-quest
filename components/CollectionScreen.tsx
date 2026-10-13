@@ -20,18 +20,23 @@ type CollectionScreenProps = {
     stopSpeaking: () => void;
     onViewCard?: () => void;
     onSelfJudge?: (word: CollectionWord, remembered: boolean) => void;
+    onRegisterMistake?: (input: { kanji: string; reading: string; note: string }) => Promise<boolean>;
 };
 
 export default function CollectionScreen(props: CollectionScreenProps) {
     const { 
         currentUser, setView, allWordsList, challengeSettings, 
         speakWord, renderReading, getFullReading, stopSpeaking, onViewCard,
-        onSelfJudge
+        onSelfJudge, onRegisterMistake
     } = props;
     
     const [mainTab, setMainTab] = useState<'words'|'tips'>('words');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [tipSearchQuery, setTipSearchQuery] = useState('');
+    const [isMistakeFormOpen, setIsMistakeFormOpen] = useState(false);
+    const [isSavingMistake, setIsSavingMistake] = useState(false);
+    const [mistakeForm, setMistakeForm] = useState({ kanji: '', reading: '', note: '' });
     const [flashcardMode, setFlashcardMode] = useState<'normal'|'hide_kanji'|'hide_reading'>('normal');
     
     // グリッドでのクイズ表示用に保持
@@ -41,6 +46,9 @@ export default function CollectionScreen(props: CollectionScreenProps) {
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
     const unlockedTips = challengeSettings?.unlocked_tips || [];
+    const filteredTips = unlockedTips
+      .map((tip, index) => ({ tip, index }))
+      .filter(({ tip }) => tip.toLocaleLowerCase().includes(tipSearchQuery.trim().toLocaleLowerCase()));
 
     const categoryStats = useMemo(() => {
         const standardCategories = CATEGORIES.map(cat => {
@@ -89,6 +97,23 @@ export default function CollectionScreen(props: CollectionScreenProps) {
         setSelectedIndex(index);
     };
 
+    const handleMistakeSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!onRegisterMistake || isSavingMistake) return;
+      setIsSavingMistake(true);
+      try {
+        const registered = await onRegisterMistake(mistakeForm);
+        if (registered) {
+          setMistakeForm({ kanji: '', reading: '', note: '' });
+          setIsMistakeFormOpen(false);
+          setSelectedCategory('mistakes');
+          setMainTab('words');
+        }
+      } finally {
+        setIsSavingMistake(false);
+      }
+    };
+
     return (
         <div className={`min-h-screen ${currentUser.light} p-4 font-sans pb-24`}>
           <div className="max-w-2xl mx-auto">
@@ -127,6 +152,60 @@ export default function CollectionScreen(props: CollectionScreenProps) {
               <>
                 {!selectedCategory ? (
                     <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4">
+                        {currentUser.id === 'brother' && (
+                          <section className="rounded-3xl border-2 border-rose-200 bg-rose-50 p-4 shadow-sm">
+                            <button
+                              type="button"
+                              aria-expanded={isMistakeFormOpen}
+                              onClick={() => setIsMistakeFormOpen(open => !open)}
+                              className="flex w-full items-center justify-between gap-3 text-left"
+                            >
+                              <span>
+                                <span className="block text-base font-black text-rose-700">✍️ 間違えた漢字を登録</span>
+                                <span className="mt-1 block text-xs font-bold text-rose-600">別の学習帳で間違えた漢字を追加できます</span>
+                              </span>
+                              <span className="shrink-0 text-xl font-black text-rose-500">{isMistakeFormOpen ? '−' : '＋'}</span>
+                            </button>
+                            {isMistakeFormOpen && (
+                              <form onSubmit={handleMistakeSubmit} className="mt-4 space-y-3 border-t border-rose-200 pt-4">
+                                <input
+                                  required
+                                  maxLength={20}
+                                  value={mistakeForm.kanji}
+                                  onChange={event => setMistakeForm(form => ({ ...form, kanji: event.target.value }))}
+                                  placeholder="漢字（必須）"
+                                  aria-label="間違えた漢字"
+                                  className="w-full rounded-xl border border-rose-200 bg-white px-4 py-3 text-xl font-black text-stone-800 outline-none focus:border-rose-400"
+                                />
+                                <input
+                                  required
+                                  maxLength={40}
+                                  value={mistakeForm.reading}
+                                  onChange={event => setMistakeForm(form => ({ ...form, reading: event.target.value }))}
+                                  placeholder="読み（必須）"
+                                  aria-label="漢字の読み"
+                                  className="w-full rounded-xl border border-rose-200 bg-white px-4 py-3 font-bold text-stone-700 outline-none focus:border-rose-400"
+                                />
+                                <textarea
+                                  maxLength={200}
+                                  value={mistakeForm.note}
+                                  onChange={event => setMistakeForm(form => ({ ...form, note: event.target.value }))}
+                                  placeholder="問題文や覚え方のメモ（任意）"
+                                  aria-label="問題文や覚え方のメモ"
+                                  rows={2}
+                                  className="w-full resize-y rounded-xl border border-rose-200 bg-white px-4 py-3 text-sm font-medium text-stone-700 outline-none focus:border-rose-400"
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={isSavingMistake}
+                                  className="w-full rounded-xl bg-rose-600 px-4 py-3 font-black text-white shadow-sm transition active:scale-[0.98] disabled:opacity-60"
+                                >
+                                  {isSavingMistake ? '登録中...' : '登録して間違いリストを見る'}
+                                </button>
+                              </form>
+                            )}
+                          </section>
+                        )}
                         {categoryStats.map(cat => (
                             <button 
                                 key={cat.id} 
@@ -192,28 +271,36 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             )}
 
             {mainTab === 'tips' && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                    {unlockedTips.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-6">
-                            {unlockedTips.map((tip: string, i: number) => (
-                                <div key={i} className="relative group">
-                                    <div className="absolute -inset-1 bg-amber-200/30 rounded-[2rem] blur-sm"></div>
-                                    <div className="relative bg-[#fdf6e3] p-8 rounded-[1.5rem] shadow-xl border-x-[12px] border-amber-900/10 overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-amber-800/20 rounded-tl-3xl"></div>
-                                        <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-amber-800/20 rounded-br-3xl"></div>
-                                        
-                                        <div className="flex items-start gap-4">
-                                            <span className="text-4xl drop-shadow-md shrink-0">📜</span>
-                                            <p className="text-lg font-black text-amber-900 leading-relaxed text-left font-serif italic">
-                                                {tip}
-                                            </p>
-                                        </div>
-                                        <p className="text-right text-[10px] font-black text-amber-800/40 mt-4 tracking-tighter">DISCOVERED TIP #{i+1}</p>
-                                    </div>
-                                </div>
-                            ))}
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                <div className="rounded-2xl border border-amber-200 bg-white p-3 shadow-sm">
+                  <input
+                    type="search"
+                    value={tipSearchQuery}
+                    onChange={(event) => setTipSearchQuery(event.target.value)}
+                    placeholder="豆知識をキーワードで検索..."
+                    aria-label="豆知識を検索"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-bold text-stone-700 outline-none focus:border-amber-400"
+                  />
+                  <p className="px-1 pt-2 text-xs font-bold text-stone-500">{filteredTips.length} / {unlockedTips.length} 件</p>
+                </div>
+                {filteredTips.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-3">
+                    {filteredTips.map(({ tip, index }) => (
+                      <article key={`${index}-${tip}`} className="rounded-2xl border border-amber-200 bg-[#fdf6e3] p-4 shadow-sm sm:p-5">
+                        <div className="flex items-start gap-3">
+                          <span className="shrink-0 text-2xl" aria-hidden="true">📜</span>
+                          <p className="min-w-0 flex-1 break-words text-base font-bold leading-relaxed text-amber-950">{tip}</p>
                         </div>
-                    ) : (
+                        <p className="mt-3 text-right text-[10px] font-black text-amber-800/50">豆知識 #{index + 1}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : unlockedTips.length > 0 ? (
+                  <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
+                    <p className="text-3xl mb-2">🔎</p>
+                    <p className="font-bold text-stone-500">一致する豆知識がありません</p>
+                  </div>
+                ) : (
                         <div className="bg-white/50 border-4 border-dashed border-stone-200 rounded-[3rem] p-16 text-center">
                             <p className="text-6xl mb-6 grayscale opacity-30">📦</p>
                             <p className="text-stone-400 font-black">まだお宝がありません。<br/>冒険（10分学習）をして<br/>宝箱をみつけよう！</p>
@@ -227,10 +314,10 @@ export default function CollectionScreen(props: CollectionScreenProps) {
               ★ タスク 3: 巨大フラッシュカード化
              ========================================== */}
           {selectedIndex !== null && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/90 backdrop-blur-md animate-in fade-in" onClick={() => setSelectedIndex(null)}>
-              <div className="bg-white w-full max-w-2xl min-h-[400px] rounded-[3rem] p-8 relative flex flex-col items-center justify-center shadow-2xl animate-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center overflow-y-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 bg-stone-900/80 backdrop-blur-md animate-in fade-in" onClick={() => setSelectedIndex(null)}>
+              <div className="bg-white w-[min(88vw,42rem)] max-w-2xl max-h-[72dvh] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[2rem] sm:rounded-[3rem] p-4 pt-14 sm:p-8 sm:pt-16 relative flex flex-col items-center justify-start shadow-2xl animate-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
                 
-                <button onClick={() => setSelectedIndex(null)} className="absolute top-6 right-6 text-stone-400 hover:text-stone-600 text-3xl font-black">✖</button>
+                <button onClick={() => setSelectedIndex(null)} className="absolute top-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-stone-100 text-stone-500 hover:text-stone-700 text-2xl font-black" aria-label="閉じる">✖</button>
                 
                 <div className="flex items-center justify-between w-full mt-4">
                   {/* ◀ 前へ */}
@@ -240,17 +327,17 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                       setIsAnswerRevealed(false);
                     }}
                     disabled={selectedIndex === 0}
-                    className={`text-6xl transition-all p-4 ${selectedIndex === 0 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
+                    className={`shrink-0 text-3xl sm:text-6xl transition-all p-1 sm:p-4 ${selectedIndex === 0 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
                   >◀</button>
 
                   {/* 巨大な漢字と読み表示 */}
-                    <div className="text-center px-4 flex flex-col items-center animate-in zoom-in duration-300" key={selectedIndex}>
-                    <div className="text-6xl mb-4">{filteredWords[selectedIndex].emoji}</div>
-                    <h2 className="text-[8rem] sm:text-[10rem] font-black text-stone-800 leading-none mb-6 drop-shadow-md">
+                    <div className="min-w-0 flex-1 text-center px-1 sm:px-4 flex flex-col items-center animate-in zoom-in duration-300" key={selectedIndex}>
+                    <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">{filteredWords[selectedIndex].emoji}</div>
+                    <h2 className="text-6xl sm:text-[8rem] md:text-[10rem] font-black text-stone-800 leading-none mb-4 sm:mb-6 drop-shadow-md">
                       {flashcardMode === 'hide_kanji' && !isAnswerRevealed ? '？' : filteredWords[selectedIndex].kanji}
                     </h2>
-                    <div className="flex items-center gap-4 bg-sky-50 py-3 px-8 rounded-full border-4 border-sky-100 shadow-sm">
-                      <p className="text-4xl sm:text-5xl font-black text-sky-700">
+                    <div className="flex max-w-full flex-wrap items-center justify-center gap-2 sm:gap-4 bg-sky-50 py-3 px-3 sm:px-8 rounded-full border-4 border-sky-100 shadow-sm">
+                      <p className="text-2xl sm:text-4xl md:text-5xl font-black leading-tight text-sky-700">
                         {flashcardMode === 'hide_reading' && !isAnswerRevealed ? '？？？' : renderReading(filteredWords[selectedIndex].reading, filteredWords[selectedIndex].okurigana)}
                       </p>
                       <button 
@@ -305,11 +392,11 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                       setIsAnswerRevealed(false);
                     }}
                     disabled={selectedIndex === filteredWords.length - 1}
-                    className={`text-6xl transition-all p-4 ${selectedIndex === filteredWords.length - 1 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
+                    className={`shrink-0 text-3xl sm:text-6xl transition-all p-1 sm:p-4 ${selectedIndex === filteredWords.length - 1 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
                   >▶</button>
                 </div>
                 
-                <p className="absolute bottom-6 text-stone-400 font-bold tracking-widest">
+                <p className="mt-6 text-stone-400 font-bold tracking-widest">
                   {selectedIndex + 1} / {filteredWords.length}
                 </p>
               </div>
