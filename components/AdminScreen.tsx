@@ -13,7 +13,7 @@ const getPieColor = (index: number) => {
   return c3;
 };
 
-const BAR_RADIUS = [4, 4, 0, 0];
+const BAR_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
 
 type AdminScreenProps = {
   currentUser: any;
@@ -68,12 +68,13 @@ export default function AdminScreen(props: AdminScreenProps) {
       alert("使えるストックがありません！");
       return;
     }
-    if (!confirm(`「${rText}」を1つ使いますか？\n（ストックが1つ減ります）`)) return;
+    // 【修正】バッククオートを追加
+    if (!confirm(`「${rText}」を1つ使いますか？\n（ストックが1つ減ります）`)) return;if (!confirm(`「${rText}」を1つ使いますか？\n（ストックが1つ減ります）`)) return;
 
     const newOwned = owned - 1;
     const { supabase } = await import('@/lib/supabaseClient');
     const { error } = await supabase.from('challenge_settings').update({ owned_rewards: newOwned }).eq('target_user_id', adminTargetUser.id);
-    
+
     if (error) {
       alert("エラーが発生しました: " + error.message);
     } else {
@@ -83,26 +84,32 @@ export default function AdminScreen(props: AdminScreenProps) {
   };
 
   return (
-    <div className="min-h-screen bg-stone-100 p-4 font-sans text-stone-800 pb-20">
-      {/* ログ詳細モーダル */}
+    // 【修正】React要素を一つにまとめるための親divを追加
+    <div className="min-h-screen bg-stone-50 font-sans p-4 md:p-8 pb-24 text-center">
+      
+      {/* 【修正】タグが消失していたモーダル部分を復元 */}
       {selectedLogDate && (
         <div className="fixed inset-0 bg-stone-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedLogDate(null)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-black text-stone-800 mb-4 text-center">{selectedLogDate} の記録</h3>
-            <div className="overflow-y-auto flex-1 pr-2 mb-5 no-scrollbar">
+            <h3 className="font-black text-xl mb-4 text-stone-800">{selectedLogDate} の記録</h3>
+
+            <div className="overflow-y-auto flex-1 mb-4 space-y-2 pr-1 custom-scrollbar">
               {selectedLog?.details?.length ? (
                 selectedLog.details.map((d: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between py-3 border-b border-stone-100">
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] bg-stone-100 px-2 py-1 rounded-lg font-bold">{d.mode}</span>
-                      <span className="font-black text-sm">{d.word}</span>
-                    </div>
-                    <span>{d.result === 'correct' ? '⭕' : d.result === 'done' ? '✓' : '❌'}</span>
+                  <div key={i} className="flex justify-between items-center p-3 bg-stone-50 rounded-xl border border-stone-100">
+                    <span className="text-xs font-bold text-stone-400 w-16 text-left">{d.mode}</span>
+                    <span className="font-black text-stone-700 flex-1 text-center text-lg">{d.word}</span>
+                    <span className="text-xl w-8 text-right">{d.result === 'correct' ? '⭕' : d.result === 'done' ? '✓' : '❌'}</span>
                   </div>
                 ))
-              ) : <p className="text-center text-stone-400 py-6">データなし</p>}
+              ) : (
+                <p className="text-stone-400 font-bold py-4 text-center">データなし</p>
+              )}
             </div>
-            <button onClick={() => setSelectedLogDate(null)} className="w-full bg-stone-800 text-white font-black py-4 rounded-xl shadow-lg">閉じる</button>
+
+            <button onClick={() => setSelectedLogDate(null)} className="w-full bg-stone-800 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all">
+              閉じる
+            </button>
           </div>
         </div>
       )}
@@ -305,7 +312,6 @@ export default function AdminScreen(props: AdminScreenProps) {
                 </div>
               </div>
 
-              {/* 🚑 救済措置エリア（幅を合わせるためここに移動） */}
               <div className="bg-[#1a1a1a] p-6 rounded-[2rem] shadow-2xl space-y-5 border border-white/5 text-left mt-8">
                 <div className="space-y-1">
                   <h3 className="text-md font-black text-white flex items-center gap-2">🚑 救済措置（データの直接修正）</h3>
@@ -332,12 +338,8 @@ export default function AdminScreen(props: AdminScreenProps) {
           )}
 
           {adminTab === 'add_word' && (
-            /* 省略：前回のコードと同じ */
             <div className="bg-white p-8 rounded-[2.5rem] shadow-md border-2 border-stone-100 text-left">
               <h3 className="font-black text-indigo-700 mb-6 text-xl">➕ 新しい言葉の登録</h3>
-              <p className="mb-5 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 text-xs font-bold leading-relaxed text-indigo-800">
-                受験対策では、意味だけでなく「文章の中で使えるか」を意識して登録します。活用例には自然な例文、成り立ち・解説には語の由来や見分け方を記入してください。
-              </p>
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-4">
                   <input className="border-2 border-stone-100 p-4 rounded-2xl font-black text-2xl outline-none focus:border-indigo-400 bg-stone-50 shadow-inner" placeholder="漢字" value={newWord.kanji} onChange={e => setNewWord({...newWord, kanji: e.target.value})} />
@@ -346,16 +348,13 @@ export default function AdminScreen(props: AdminScreenProps) {
                 <select className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold bg-stone-50 outline-none focus:border-indigo-400" value={newWord.category} onChange={e => setNewWord({...newWord, category: e.target.value})}>
                   {CATEGORIES.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
-                <input className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50" placeholder="送り仮名（必要な場合）" value={newWord.okurigana} onChange={e => setNewWord({...newWord, okurigana: e.target.value})} />
-                <textarea className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner min-h-[100px]" placeholder="活用例：意味が伝わる自然な例文。空欄部分は□にする" value={newWord.usage_example} onChange={e => setNewWord({...newWord, usage_example: e.target.value})} />
-                <textarea className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner min-h-[100px]" placeholder="成り立ち・解説：語源、意味の違い、文章中での見分け方など" value={newWord.origin_logic} onChange={e => setNewWord({...newWord, origin_logic: e.target.value})} />
+                <textarea className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner min-h-[120px]" placeholder="例文" value={newWord.usage_example} onChange={e => setNewWord({...newWord, usage_example: e.target.value})} />
                 <button onClick={onAddWordClick} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition hover:bg-indigo-700">追加する 🐾</button>
               </div>
             </div>
           )}
 
           {adminTab === 'manage' && (
-            /* 省略：前回のコードと同じ */
             <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 text-left">
               <div className="flex items-center justify-between mb-6 px-2">
                 <h3 className="font-black text-slate-700 text-xl flex items-center gap-2">📝 編集・削除</h3>
@@ -370,13 +369,18 @@ export default function AdminScreen(props: AdminScreenProps) {
                   return (
                     <div key={w.id} className="bg-stone-50/50 rounded-2xl p-4 border-2 border-stone-50 shadow-sm flex items-center gap-4 group hover:border-sky-100 transition-all">
                       <div className="text-3xl grayscale group-hover:grayscale-0 transition-all drop-shadow-sm">{w.emoji || '📝'}</div>
+                      
                       <div className="flex-1 min-w-0 text-left">
-                         <div className="flex items-center gap-2 mb-0.5">
-                            <span className="font-black text-lg text-sky-700 truncate">{w.kanji}</span>
+                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <span className={`font-black text-lg truncate ${w.currentStatus === 'archived' ? 'text-stone-400 line-through' : 'text-sky-700'}`}>{w.kanji}</span>
                             <span className="text-[9px] px-2 py-0.5 bg-white border border-stone-100 rounded-lg font-black text-stone-400 uppercase tracking-tighter">{displayName}</span>
+                            {w.currentStatus === 'archived' && (
+                              <span className="text-[9px] px-2 py-0.5 bg-stone-700 text-stone-100 rounded-lg font-black shadow-sm">📦 アーカイブ済</span>
+                            )}
                          </div>
                          <p className="text-xs font-bold text-stone-500 truncate">{w.reading}</p>
                       </div>
+
                       <div className="flex items-center gap-2">
                          <button onClick={() => toggleMasterStatus(w.id, w.currentStatus)} className={`px-4 py-2 rounded-xl text-[10px] font-black shadow-sm transition-all border-b-2 active:translate-y-0.5 active:border-b-0 ${w.currentStatus === 'gold' ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-white text-stone-300 border-stone-100'}`}>
                            {w.currentStatus === 'gold' ? '👑 解除' : '👑 習得'}

@@ -21,16 +21,18 @@ type CollectionScreenProps = {
     onViewCard?: () => void;
     onSelfJudge?: (word: CollectionWord, remembered: boolean) => void;
     onRegisterMistake?: (input: { kanji: string; reading: string; note: string }) => Promise<boolean>;
+    toggleArchiveStatus: (id: number, currentStatus: string) => void; // ★ 追加
 };
 
 export default function CollectionScreen(props: CollectionScreenProps) {
     const { 
         currentUser, setView, allWordsList, challengeSettings, 
         speakWord, renderReading, getFullReading, stopSpeaking, onViewCard,
-        onSelfJudge, onRegisterMistake
+        onSelfJudge, onRegisterMistake, toggleArchiveStatus // ★ 追加
     } = props;
     
-    const [mainTab, setMainTab] = useState<'words'|'tips'>('words');
+    // ★ 'archived' タブを追加
+    const [mainTab, setMainTab] = useState<'words'|'tips'|'archived'>('words');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [tipSearchQuery, setTipSearchQuery] = useState('');
@@ -42,7 +44,7 @@ export default function CollectionScreen(props: CollectionScreenProps) {
     // グリッドでのクイズ表示用に保持
     const [revealedCards, setRevealedCards] = useState<number[]>([]);
     const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
-    // ★ フラッシュカードの現在地インデックス
+    // フラッシュカードの現在地インデックス
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
     const unlockedTips = challengeSettings?.unlocked_tips || [];
@@ -78,13 +80,22 @@ export default function CollectionScreen(props: CollectionScreenProps) {
 
     const filteredWords = useMemo(() => {
         return allWordsList.filter(w => {
-          if (selectedCategory === 'mistakes' && !((w.mistakeCount || 0) > 0)) return false;
-          if (selectedCategory === 'hard' && !((w.mistakeCount || 0) >= 2)) return false;
-          if (selectedCategory !== 'mistakes' && selectedCategory !== 'hard' && w.kanji_level !== selectedCategory) return false;
+            // ★ アーカイブタブの処理
+            if (mainTab === 'archived') {
+                if (w.currentStatus !== 'archived') return false;
+            } 
+            // ★ 通常のずかんタブからはアーカイブを除外
+            else if (mainTab === 'words') {
+                if (w.currentStatus === 'archived') return false; 
+                if (selectedCategory === 'mistakes' && !((w.mistakeCount || 0) > 0)) return false;
+                if (selectedCategory === 'hard' && !((w.mistakeCount || 0) >= 2)) return false;
+                if (selectedCategory !== 'mistakes' && selectedCategory !== 'hard' && w.kanji_level !== selectedCategory) return false;
+            }
+
             if (searchQuery && !w.kanji.includes(searchQuery) && !w.reading.includes(searchQuery)) return false;
             return true;
         });
-    }, [allWordsList, selectedCategory, searchQuery]);
+    }, [allWordsList, selectedCategory, searchQuery, mainTab]); // ★ mainTab を依存配列に追加
 
     // グリッドのタップ時の挙動（クイズ表示を解除 ＆ フラッシュカードを開く）
     const handleCardClick = (w: CollectionWord, index: number) => {
@@ -129,13 +140,13 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                 {selectedCategory ? '← もどる' : '🏠 むらへ'}
               </button>
               <h2 className="text-xl font-black text-stone-700 tracking-tighter">
-                {mainTab === 'words' ? '📖 言葉の図鑑' : '🎁 たからもの'}
+                {mainTab === 'words' ? '📖 言葉の図鑑' : mainTab === 'tips' ? '🎁 たからもの' : '📦 アーカイブ'}
               </h2>
             </div>
 
             <div className="flex p-1 bg-stone-200/50 rounded-2xl mb-6">
                 <button 
-                    onClick={() => setMainTab('words')} 
+                    onClick={() => { setMainTab('words'); setSelectedCategory(null); }} 
                     className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'words' ? 'bg-white text-emerald-600 shadow-md' : 'text-stone-500'}`}
                 >
                     漢字ずかん
@@ -145,6 +156,13 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                     className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'tips' ? 'bg-amber-700 text-amber-100 shadow-md' : 'text-stone-500'}`}
                 >
                     豆知識 ({unlockedTips.length})
+                </button>
+                {/* ★ アーカイブタブの追加 */}
+                <button 
+                    onClick={() => { setMainTab('archived'); setSelectedCategory(null); }} 
+                    className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'archived' ? 'bg-stone-700 text-stone-100 shadow-md' : 'text-stone-500'}`}
+                >
+                    📦 アーカイブ
                 </button>
             </div>
 
@@ -308,6 +326,32 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                     )}
                 </div>
             )}
+
+            {/* ★ アーカイブ一覧の表示 */}
+            {mainTab === 'archived' && (
+                <div className="animate-in fade-in slide-in-from-bottom-4">
+                    {filteredWords.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-3">
+                          {filteredWords.map((w, index) => (
+                            <div key={w.id} onClick={() => handleCardClick(w, index)} className="bg-stone-100 rounded-[2rem] p-3 border-b-4 border-stone-300 shadow-inner flex flex-col items-center justify-center relative aspect-square cursor-pointer active:scale-95 transition-transform overflow-hidden grayscale hover:grayscale-0">
+                              <div className="text-2xl mb-1">{w.emoji}</div>
+                              <div className="relative w-full text-center">
+                                <span className="text-3xl font-black text-stone-400 block truncate">{w.kanji}</span>
+                              </div>
+                              <div className="relative mt-2 w-full text-center">
+                                <span className="text-[10px] font-bold text-stone-500 bg-stone-200 px-2 py-0.5 rounded-full inline-block truncate max-w-full">{w.reading}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                    ) : (
+                        <div className="bg-white/50 border-4 border-dashed border-stone-200 rounded-[3rem] p-16 text-center">
+                            <p className="text-6xl mb-6 grayscale opacity-30">📦</p>
+                            <p className="text-stone-400 font-black">アーカイブされた漢字はありません。</p>
+                        </div>
+                    )}
+                </div>
+            )}
           </div>
 
           {/* ==========================================
@@ -359,6 +403,18 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                          <p className="text-lg font-bold text-amber-900/80">{filteredWords[selectedIndex].origin_logic}</p>
                        </div>
                     )}
+
+                    {/* ★ アーカイブの切り替えボタン */}
+                    <button 
+                      onClick={() => {
+                        toggleArchiveStatus(filteredWords[selectedIndex].id, filteredWords[selectedIndex].currentStatus || 'learning');
+                        setSelectedIndex(null);
+                      }}
+                      className="mt-6 bg-stone-100 hover:bg-stone-200 text-stone-500 font-black py-3 px-6 rounded-xl transition-colors shadow-sm text-sm border-2 border-stone-200"
+                    >
+                      {filteredWords[selectedIndex].currentStatus === 'archived' ? '✨ アーカイブから戻す' : '📦 この漢字をアーカイブする'}
+                    </button>
+
                     {flashcardMode !== 'normal' && !isAnswerRevealed && (
                       <button
                         onClick={() => setIsAnswerRevealed(true)}

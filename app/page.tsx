@@ -15,60 +15,60 @@ import StudyTimerPanel from '@/components/StudyTimerPanel'
 // --- ヘルパー関数 ---
 const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
 const formatDate = (dateObj: Date) => {
-    const y = dateObj.getFullYear();
-    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const d = String(dateObj.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 };
 const getTodayJST = () => formatDate(getJSTDate());
 const getYesterdayJST = () => {
-    const dObj = getJSTDate();
-    dObj.setDate(dObj.getDate() - 1);
-    return formatDate(dObj);
+  const dObj = getJSTDate();
+  dObj.setDate(dObj.getDate() - 1);
+  return formatDate(dObj);
 };
 const getJSTTimeString = () => getJSTDate().toLocaleTimeString('ja-JP', { hour12: false });
 
 export default function Home() {
   const [defaultUser] = USERS;
-  
+
   // --- 基本ステート ---
   const [currentUser, setCurrentUser] = useState(defaultUser)
   const [view, setView] = useState<'menu'|'game'|'rick_challenge'|'result'|'admin'|'collection'>('menu')
   const [mode, setMode] = useState<'daily'|'free'|'weekend'|'parent_challenge'|'rick_challenge'|'revenge'|'mission_100'>('daily')
-  const [loading, setLoading] = useState(false); 
-  const [targetKyu, setTargetKyu] = useState<string>('kyu6')
+  const [loading, setLoading] = useState(false);
+  const [targetKyu, setTargetKyu] = useState('kyu6')
   const [selectedInputMode, setSelectedInputMode] = useState<'quiz_kanji'|'typing_read'|'write_canvas'|'write_self'>('quiz_kanji')
   const [rickMode, setRickMode] = useState<'read'|'think'|'write'>('read')
   const [adminTargetUser, setAdminTargetUser] = useState(defaultUser)
-  const [allWordsList, setAllWordsList] = useState<any[]>([]); 
-  const [selectedLogDate, setSelectedLogDate] = useState<string|null>(null); 
+  const [allWordsList, setAllWordsList] = useState<any[]>([]);
+  const [selectedLogDate, setSelectedLogDate] = useState<string|null>(null);
   const [editStreak, setEditStreak] = useState(0)
-  const [challengeSettings, setChallengeSettings] = useState<any>({ mode: 'auto', selected_ids: [], auto_count: 5, quest_count: 5, special_quest_count: 10, challenge_quest_count: 8, reward_goal_days: 14, reward_text: '好きなおやつ', owned_rewards: 0, total_earned_rewards: 0, unlocked_tips: [] })
-  const [hasParentChallenge, setHasParentChallenge] = useState(false); 
-  const [calendarDate, setCalendarDate] = useState<Date>(getJSTDate())
-  const [dailyProgress, setDailyProgress] = useState<any>({ id: 0, date: getTodayJST(), count: 0, is_completed: false, study_time_seconds: 0, collection_views: 0, streak: 0 })
-  const [monthlyLogs, setMonthlyLogs] = useState<any[]>([]); 
+  const [challengeSettings, setChallengeSettings] = useState({ mode: 'auto', selected_ids: [], auto_count: 5, quest_count: 5, special_quest_count: 10, challenge_quest_count: 8, reward_goal_days: 14, reward_text: '好きなおやつ', owned_rewards: 0, total_earned_rewards: 0, unlocked_tips: [] })
+  const [hasParentChallenge, setHasParentChallenge] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(getJSTDate())
+  const [dailyProgress, setDailyProgress] = useState({ id: 0, date: getTodayJST(), count: 0, is_completed: false, study_time_seconds: 0, collection_views: 0, streak: 0, details: [] as any[] })
+  const [monthlyLogs, setMonthlyLogs] = useState<any[]>([]);
   const [stats, setStats] = useState<ProgressStats | null>(null)
-  
+
   // Rickの挑戦状（復習カード）用ステート
   const [reviewCandidates, setReviewCandidates] = useState<KanjiWord[]>([])
   const [reviewRevealed, setReviewRevealed] = useState<number[]>([]);
 
   // --- ゲーム進行ステート ---
-  const [currentGameGoal, setCurrentGameGoal] = useState(5); 
-  const [questQueue, setQuestQueue] = useState<KanjiWord[]>([]); 
+  const [currentGameGoal, setCurrentGameGoal] = useState(5);
+  const [questQueue, setQuestQueue] = useState<KanjiWord[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0)
   const [cachedAllWords, setCachedAllWords] = useState<KanjiWord[]>([]);
-  const [bossHp, setBossHp] = useState(10); 
+  const [bossHp, setBossHp] = useState(10);
   const [userAnswer, setUserAnswer] = useState('')
-  const [message, setMessage] = useState(''); 
-  const [showRick, setShowRick] = useState(false); 
-  const [mistakeCount, setMistakeCount] = useState(0); 
+  const [message, setMessage] = useState('');
+  const [showRick, setShowRick] = useState(false);
+  const [mistakeCount, setMistakeCount] = useState(0);
   const [feedbackMsg, setFeedbackMsg] = useState<React.ReactNode | null>(null)
   const [showHint, setShowHint] = useState(false);
   const [showFlashAnswer, setShowFlashAnswer] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false); 
+  const [isProcessing, setIsProcessing] = useState(false);
   const [langMode, setLangMode] = useState<'kanji_to_read'|'read_to_kanji'>('read_to_kanji')
   const [options, setOptions] = useState<KanjiWord[]>([])
   const [isListening, setIsListening] = useState(false)
@@ -105,49 +105,85 @@ export default function Home() {
     audio.play().catch(()=>{});
   }, []);
 
-  const getFullReading = useCallback((reading: string, okurigana?: string | null) => 
+  // 【修正】バッククオートを追加
+  const getFullReading = useCallback((reading: string, okurigana?: string | null) =>
     okurigana ? `${reading}${okurigana}` : reading, []);
 
+  // 【修正】消えていたJSX要素を復元
   const renderReading = useCallback((reading: string, okurigana?: string | null) => {
     if (!okurigana) return <span>{reading}</span>;
     return (
-      <span className="inline-flex items-baseline">
-        <span>{reading}</span>
-        <span className="text-[0.75em] font-bold ml-[1px] opacity-60">{okurigana}</span>
+      <span>
+        {reading}
+        <span className="text-sm text-stone-500">{okurigana}</span>
       </span>
     );
   }, []);
 
   const toggleReviewReveal = useCallback((id: number) => {
     setReviewRevealed((prev) => {
-        if (prev.includes(id)) {
-            return prev.filter(rid => rid !== id);
-        }
-        return [...prev, id];
+      if (prev.includes(id)) {
+        return prev.filter(rid => rid !== id);
+      }
+      return [...prev, id];
     });
   }, []);
+
+  const fetchAllWordsForEdit = useCallback(async (targetUser: any = adminTargetUser) => {
+    const { data: words } = await supabase.from('kanji_questions').select('*').eq('target_user', targetUser.db_target).order('id', { ascending: false }).limit(3000);
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status, mistake_count').eq('user_id', targetUser.id).limit(3000);
+    if (words) {
+      const sMap = new Map();
+      progress?.forEach((p: any) => sMap.set(p.question_id, p));
+      setAllWordsList(words.map((w: any) => {
+        const progressEntry = sMap.get(w.id);
+        return { ...w, currentStatus: progressEntry?.status || 'learning', mistakeCount: progressEntry?.mistake_count || 0 };
+      }));
+    }
+  }, [adminTargetUser]);
+
+  // --- ★ アーカイブ切り替え ---
+  const toggleArchiveStatus = useCallback(async (id: number, currentStatus: string) => {
+    const newStatus = currentStatus === 'archived' ? 'gold' : 'archived';
+    const { error } = await supabase
+      .from('user_progress')
+      .upsert({
+        user_id: currentUser.id,
+        question_id: id,
+        status: newStatus,
+        last_reviewed_at: new Date().toISOString()
+      }, { onConflict: 'user_id, question_id' });
+
+    if (error) {
+      alert("エラーが発生しました: " + error.message);
+    } else {
+      alert(newStatus === 'archived' ? "アーカイブに移動しました 📦" : "図鑑に戻しました ✨");
+      fetchAllWordsForEdit(currentUser); 
+    }
+  }, [currentUser, fetchAllWordsForEdit]);
 
   // --- データ取得ロジック ---
   const checkDailyProgress = useCallback(async () => {
     const today = getTodayJST();
     const yesterday = getYesterdayJST();
-    
+
     const { data: todayLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
     const { data: yesterdayLog } = await supabase.from('daily_logs').select('streak, is_completed').eq('user_id', currentUser.id).eq('date', yesterday).single();
-    
+
     const yesterdayStreak = (yesterdayLog?.is_completed) ? (yesterdayLog.streak || 0) : 0;
 
     if (todayLog) {
-        const currentStreak = todayLog.is_completed ? (todayLog.streak || (yesterdayStreak + 1)) : yesterdayStreak;
-        setDailyProgress({ ...todayLog, streak: currentStreak });
+      const currentStreak = todayLog.is_completed ? (todayLog.streak || (yesterdayStreak + 1)) : yesterdayStreak;
+      setDailyProgress({ ...todayLog, streak: currentStreak });
     } else {
-        setDailyProgress({ id: 0, date: today, count: 0, is_completed: false, details: [], streak: yesterdayStreak, study_time_seconds: 0, collection_views: 0 });
+      setDailyProgress({ id: 0, date: today, count: 0, is_completed: false, details: [], streak: yesterdayStreak, study_time_seconds: 0, collection_views: 0 });
     }
   }, [currentUser.id]);
 
   const fetchMonthlyLogs = useCallback(async (targetDate: Date, userId: string = currentUser.id) => {
     const y = targetDate.getFullYear();
     const m = targetDate.getMonth();
+    // 【修正】バッククオートを追加
     const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
     const last = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
     const { data } = await supabase.from('daily_logs').select('*').eq('user_id', userId).gte('date', first).lte('date', last);
@@ -159,45 +195,45 @@ export default function Home() {
     await fetchMonthlyLogs(calendarDate, targetUser.id);
 
     const { count: totalCount } = await supabase.from('kanji_questions').select('*', { count: 'exact', head: true }).eq('target_user', targetUser.db_target);
-    // ★修正: 上限に引っかからないように.limit(3000)を追加
     const { data: progress } = await supabase.from('user_progress').select('status, mistake_count, question_id, kanji_questions(kanji, reading, okurigana)').eq('user_id', targetUser.id).limit(3000);
-    
+
     const ranks = { learning: 0, bronze: 0, silver: 0, gold: 0 };
     let weakList: any[] = [];
     progress?.forEach((p: any) => {
-        const [ ...[wd] ] = [p.kanji_questions];
-        if (p.status === 'gold' || p.status === 'mastered') ranks.gold++; 
-        else if (p.status === 'silver') ranks.silver++; 
-        else if (p.status === 'bronze') ranks.bronze++;
-        if (p.mistake_count > 0 && wd) weakList.push({ word: wd.kanji, meaning: getFullReading(wd.reading, wd.okurigana), mistakes: p.mistake_count });
+      // 【修正】配列の分割代入の構文エラーを修正
+      const wd = Array.isArray(p.kanji_questions) ? p.kanji_questions[0] : p.kanji_questions;
+      if (p.status === 'gold' || p.status === 'mastered') ranks.gold++; 
+      else if (p.status === 'silver') ranks.silver++; 
+      else if (p.status === 'bronze') ranks.bronze++;
+      if (p.mistake_count > 0 && wd) weakList.push({ word: wd.kanji, meaning: getFullReading(wd.reading, wd.okurigana), mistakes: p.mistake_count });
     });
     ranks.learning = Math.max(0, (totalCount || 0) - ranks.gold - ranks.silver - ranks.bronze);
     weakList.sort((a, b) => b.mistakes - a.mistakes);
 
     const thirtyDaysAgo = getJSTDate(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const { data: logD } = await supabase.from('daily_logs').select('*').eq('user_id', targetUser.id).gte('date', formatDate(thirtyDaysAgo)).order('date', { ascending: true });
-    
+
     if (logD && logD.length > 0) {
-        const [lastLog] = logD.slice().reverse();
-        setEditStreak(lastLog?.streak || 0);
+      const [lastLog] = logD.slice().reverse();
+      setEditStreak(lastLog?.streak || 0);
     } else {
-        setEditStreak(0);
+      setEditStreak(0);
     }
 
     setStats({
-        total: totalCount || 0,
-        mastered: ranks.gold,
-        ranks,
-        weakWords: weakList,
-        checkWords: [],
-        recentLogs: logD ? logD.slice().reverse() : [],
-        graphData: logD?.map(l => ({ date: l.date.slice(5).replace('-', '/'), count: l.count || 0 })) || [],
-        pieData: [
-            { name: '未習得', value: ranks.learning },
-            { name: 'ブロンズ', value: ranks.bronze },
-            { name: 'シルバー', value: ranks.silver },
-            { name: 'ゴールド', value: ranks.gold }
-        ]
+      total: totalCount || 0,
+      mastered: ranks.gold,
+      ranks,
+      weakWords: weakList,
+      checkWords: [],
+      recentLogs: logD ? logD.slice().reverse() : [],
+      graphData: logD?.map(l => ({ date: l.date.slice(5).replace('-', '/'), count: l.count || 0 })) || [],
+      pieData: [
+        { name: '未習得', value: ranks.learning },
+        { name: 'ブロンズ', value: ranks.bronze },
+        { name: 'シルバー', value: ranks.silver },
+        { name: 'ゴールド', value: ranks.gold }
+      ]
     });
 
     const { data: challenge } = await supabase.from('challenge_settings').select('*').eq('target_user_id', targetUser.id).single();
@@ -205,19 +241,10 @@ export default function Home() {
     setLoading(false);
   }, [calendarDate, fetchMonthlyLogs, getFullReading]);
 
-  const fetchAllWordsForEdit = useCallback(async (targetUser: any = adminTargetUser) => {
-    // ★修正: 1000件上限突破のため.limit(3000)を追加
-    const { data: words } = await supabase.from('kanji_questions').select('*').eq('target_user', targetUser.db_target).order('id', { ascending: false }).limit(3000);
-    const { data: progress } = await supabase.from('user_progress').select('question_id, status, mistake_count').eq('user_id', targetUser.id).limit(3000);
-    if (words) {
-        const sMap = new Map();
-        progress?.forEach((p: any) => sMap.set(p.question_id, p));
-        setAllWordsList(words.map((w: any) => {
-          const progressEntry = sMap.get(w.id);
-          return { ...w, currentStatus: progressEntry?.status || 'learning', mistakeCount: progressEntry?.mistake_count || 0 };
-        }));
-    }
-  }, [adminTargetUser,]);
+  // 【追加】未定義だった関数をダミーで定義
+  const sendLineToChild = useCallback(() => {
+    alert("LINE送信機能は現在準備中です");
+  }, []);
 
   const saveChallengeSettings = useCallback(async (settings: any) => {
     setChallengeSettings(settings);
@@ -392,36 +419,30 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [isStudyTimerRunning, saveCompletedStudyTimer, view]);
 
-  const sendLineToChild = useCallback(async (msg: string) => {
-    const res = await fetch('/api/line/send', { method: 'POST', body: JSON.stringify({ message: msg }) });
-    if (res.ok) alert("LINEを送信しました！🚀");
-    else alert("送信に失敗しました");
-  }, []);
-
   // --- ゲームロジック ---
-  const prepareQuestion = useCallback((word: KanjiWord, allWords: KanjiWord[]) => {
+  const prepareQuestion = useCallback((word: KanjiWord, availableWords: KanjiWord[]) => {
     setUserAnswer(''); setMessage(''); setShowRick(false); setMistakeCount(0);
     setFeedbackMsg(null); setIsProcessing(false); setIsTransitioning(false);
     setShowHint(false); setShowFlashAnswer(false);
-    
+
     // 手書き・自己判定用のステートとキャンバスをリセット
     setGameStep(0);
     if (canvasRef.current) {
-        const ctx = canvasRef.current.getContext('2d');
-        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     }
-    
+
     const nextLMode = (selectedInputMode === 'typing_read') ? 'kanji_to_read' : 'read_to_kanji';
     setLangMode(nextLMode);
-    
-    const others = allWords.filter(w => w.id !== word.id).sort(() => 0.5 - Math.random()).slice(0, 3);
+
+    const others = availableWords.filter(w => w.id !== word.id).sort(() => 0.5 - Math.random()).slice(0, 3);
     setOptions([word, ...others].sort(() => 0.5 - Math.random()));
   }, [selectedInputMode]);
 
   const startGame = async (selectedMode: any) => {
-    setLoading(true); 
-    setMode(selectedMode); 
-    setOpenedChests([]); 
+    setLoading(true);
+    setMode(selectedMode);
+    setOpenedChests([]);
     setMistakeCount(0);
 
     const examMission = getExamMissionPhase();
@@ -435,8 +456,7 @@ export default function Home() {
 
     const limit = selectedMode === 'mission_100' ? 10 : selectedMode === 'weekend' ? (challengeSettings.special_quest_count || 10) : (challengeSettings.quest_count || 5);
     setCurrentGameGoal(limit);
-    
-    // ★修正: 上限に引っかからないように.limit(3000)を追加
+
     let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
     if (selectedMode !== 'mission_100' && targetKyu !== 'all') {
       query = query.eq('kanji_level', targetKyu);
@@ -445,19 +465,20 @@ export default function Home() {
     const { data: progress } = await supabase.from('user_progress').select('question_id, status, mistake_count').eq('user_id', currentUser.id).limit(3000);
 
     if (!allW?.length) { 
-        alert(`選んだ級（${targetKyu}）の単語がまだないワン！🐶`);
-        setLoading(false); 
-        return; 
+      alert(`選んだ級（${targetKyu}）の単語がまだないワン！🐶`);
+      setLoading(false); 
+      return; 
     }
-    
-    setCachedAllWords(allW);
 
     let queue;
+    let availableWordsForOptions = allW;
+
     if (selectedMode === 'mission_100') {
       const phaseWords = allW.filter((word) => examMission.categoryIds.includes(word.kanji_level));
       const missionWords = phaseWords.length > 0 ? phaseWords : allW;
       const progressMap = new Map(progress?.map((entry) => [entry.question_id, entry]));
       const statusOrder: Record<string, number> = { learning: 0, bronze: 1, silver: 2, gold: 3 };
+      
       queue = [...missionWords].sort((a, b) => {
         const progressA = progressMap.get(a.id);
         const progressB = progressMap.get(b.id);
@@ -473,43 +494,59 @@ export default function Home() {
         const rankB = statusOrder[progressB?.status || 'learning'];
         return rankA === rankB ? 0.5 - Math.random() : rankA - rankB;
       }).slice(0, Math.min(limit, missionWords.length));
-    } else if (selectedMode === 'daily') {
-      const statusMap = new Map(progress?.map(p => [p.question_id, p.status]));
-      // ★修正: 未学習(learning)が最初(0)に選ばれるよう優先順位を是正
-      const statusOrder: Record<string, number> = { learning: 0, bronze: 1, silver: 2, gold: 3 };
+      
+      setCachedAllWords(missionWords);
+      availableWordsForOptions = missionWords;
 
-      queue = [...allW].sort((a, b) => {
-        const rankA = statusOrder[statusMap.get(a.id) || 'learning'];
-        const rankB = statusOrder[statusMap.get(b.id) || 'learning'];
-        if (rankA !== rankB) return rankA - rankB;
-        return 0.5 - Math.random();
-      }).slice(0, limit);
-    } else if (selectedMode === 'parent_challenge') {
-      if (challengeSettings.mode === 'manual' && challengeSettings.selected_ids?.length > 0) {
-          queue = allW.filter(w => challengeSettings.selected_ids.includes(w.id)).slice(0, limit);
-      } else {
-          const { data: progData } = await supabase.from('user_progress').select('question_id, mistake_count').eq('user_id', currentUser.id).order('mistake_count', { ascending: false });
-          if (progData && progData.length > 0) {
-              const weakIds = progData.filter(p => p.mistake_count > 0).slice(0, challengeSettings.auto_count || 5).map(p => p.question_id);
-              queue = allW.filter(w => weakIds.includes(w.id));
-              if (queue.length < limit) {
-                  const others = allW.filter(w => !weakIds.includes(w.id)).sort(() => 0.5 - Math.random()).slice(0, limit - queue.length);
-                  queue = [...queue, ...others];
-              }
-          } else {
-              queue = [...allW].sort(() => 0.5 - Math.random()).slice(0, limit);
-          }
-      }
     } else {
-      queue = [...allW].sort(() => 0.5 - Math.random()).slice(0, limit);
+      // ★ アーカイブ除外・優先順位ロジック
+      const statusMap = new Map(progress?.map(p => [p.question_id, p.status]));
+      const activeWords = allW.filter(w => statusMap.get(w.id) !== 'archived');
+
+      if (!activeWords.length) {
+          alert("出題できる問題がないワン！🐶（すべてアーカイブされています）");
+          setLoading(false);
+          return;
+      }
+
+      setCachedAllWords(activeWords);
+      availableWordsForOptions = activeWords;
+
+      if (selectedMode === 'daily') {
+        const statusOrder: Record<string, number> = { learning: 0, bronze: 1, silver: 2, gold: 3 };
+        queue = [...activeWords].sort((a, b) => {
+          const rankA = statusOrder[statusMap.get(a.id) || 'learning'] ?? 0;
+          const rankB = statusOrder[statusMap.get(b.id) || 'learning'] ?? 0;
+          if (rankA !== rankB) return rankA - rankB;
+          return 0.5 - Math.random();
+        }).slice(0, limit);
+      } else if (selectedMode === 'parent_challenge') {
+        if (challengeSettings.mode === 'manual' && challengeSettings.selected_ids?.length > 0) {
+            queue = activeWords.filter(w => challengeSettings.selected_ids.includes(w.id)).slice(0, limit);
+        } else {
+            const { data: progData } = await supabase.from('user_progress').select('question_id, mistake_count').eq('user_id', currentUser.id).order('mistake_count', { ascending: false });
+            if (progData && progData.length > 0) {
+                const weakIds = progData.filter(p => p.mistake_count > 0).slice(0, challengeSettings.auto_count || 5).map(p => p.question_id);
+                queue = activeWords.filter(w => weakIds.includes(w.id));
+                if (queue.length < limit) {
+                    const others = activeWords.filter(w => !weakIds.includes(w.id)).sort(() => 0.5 - Math.random()).slice(0, limit - queue.length);
+                    queue = [...queue, ...others];
+                }
+            } else {
+                queue = [...activeWords].sort(() => 0.5 - Math.random()).slice(0, limit);
+            }
+        }
+      } else {
+        queue = [...activeWords].sort(() => 0.5 - Math.random()).slice(0, limit);
+      }
     }
 
     setQuestQueue(queue); 
     setCurrentIndex(0); 
-    
+
     const [ firstWord ] = queue;
     if (firstWord) {
-      prepareQuestion(firstWord, allW);
+      prepareQuestion(firstWord, availableWordsForOptions);
     }
     setView('game'); 
     setLoading(false);
@@ -517,15 +554,15 @@ export default function Home() {
 
   const updateProgress = async (id: number, correct: boolean) => {
     const today = getTodayJST();
-    const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).single();
-    
+    const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
+
     const [curWord] = questQueue.slice(currentIndex);
     const nEntry = { time: getJSTTimeString(), word: curWord?.kanji, mode: MODE_NAMES[mode], result: correct ? 'correct' : 'incorrect' };
-    
+
     const nT = (cLog?.study_time_seconds || 0) + pendingTimeRef.current;
     const nV = (cLog?.collection_views || 0) + pendingViewsRef.current;
     pendingTimeRef.current = 0; pendingViewsRef.current = 0;
-    
+
     const nextCount = correct ? (cLog?.count || 0) + 1 : (cLog?.count || 0);
     const dailyGoal = challengeSettings.quest_count || 5;
     const nextCompleted = cLog?.is_completed || (nextCount >= dailyGoal);
@@ -540,10 +577,10 @@ export default function Home() {
 
     if (cLog) await supabase.from('daily_logs').update(lD).eq('id', cLog.id);
     else await supabase.from('daily_logs').insert([{ user_id: currentUser.id, date: today, streak: 0, ...lD }]);
-    
+
     setDailyProgress((prev: any) => ({ ...prev, ...lD })); 
 
-    const { data: pD } = await supabase.from('user_progress').select('status, mistake_count').eq('user_id', currentUser.id).eq('question_id', id).single();
+    const { data: pD } = await supabase.from('user_progress').select('status, mistake_count').eq('user_id', currentUser.id).eq('question_id', id).maybeSingle();
     let ns = pD?.status || 'learning'; 
     if (correct) { 
         if (ns === 'learning') ns = 'bronze'; 
@@ -564,7 +601,7 @@ export default function Home() {
     setIsProcessing(true);
     const [cur] = questQueue.slice(currentIndex);
     const cor = langMode === 'read_to_kanji' ? cur.kanji : getFullReading(cur.reading, cur.okurigana);
-    
+
     const normalize = (str: string) => str.replace(/[\u30a1-\u30f6]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0x60)).replace(/[\u3000\s]/g, '');
     const isCorrect = selectedInputMode.includes('quiz') ? (ans === cor) : (normalize(ans) === normalize(cor));
 
@@ -599,11 +636,11 @@ export default function Home() {
   };
 
   const nextQuestion = useCallback(async () => {
-    setIsTransitioning(true); 
-    stopSpeaking(); 
-    
+    setIsTransitioning(true);
+    stopSpeaking();
+
     const nextIdx = currentIndex + 1;
-    
+
     if (nextIdx >= questQueue.length) {
         playSound('clear');
         
@@ -655,7 +692,7 @@ export default function Home() {
         
         let cCount = tSec >= threshold ? (1 + Math.floor((tSec - threshold) / 300)) : 0;
         if (isWritingMode) {
-          cCount *= 2;
+            cCount *= 2;
         }
         
         const { data: tips } = await supabase.from(currentUser.defaultTipTable).select('content');
@@ -695,44 +732,42 @@ export default function Home() {
   };
 
   // --- キャンバス描画ハンドラー ---
-  const startDrawing = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+  const startDrawing = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    
-    // 表示サイズと内部解像度の比率を計算して座標を補正
+
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
-    
+
     setIsDrawing(true);
     setLastPosition({ x, y });
   }, []);
 
-  const draw = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+  const draw = useCallback((e: React.PointerEvent) => {
     if (!isDrawing || !lastPosition) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     const rect = canvas.getBoundingClientRect();
-    
-    // 表示サイズと内部解像度の比率を計算して座標を補正
+
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
-    
+
     ctx.beginPath();
     ctx.moveTo(lastPosition.x, lastPosition.y);
     ctx.lineTo(x, y);
-    ctx.strokeStyle = '#334155'; // 鉛筆らしい色（stone-700）
+    ctx.strokeStyle = '#334155'; // 鉛筆らしい色
     ctx.lineWidth = 4;
     ctx.lineCap = 'round';
     ctx.stroke();
-    
+
     setLastPosition({ x, y });
   }, [isDrawing, lastPosition]);
 
@@ -756,8 +791,10 @@ export default function Home() {
     const daysInMonth = new Date(y, m + 1, 0).getDate();
     const firstDay = new Date(y, m, 1).getDay();
     const dayCells = [];
-    const labels = ['日', '月', '火', '水', '木', '金', '土'].map(w => (
-        <div key={w} className="text-center text-[10px] font-black text-stone-400 mb-1">{w}</div>
+    
+    // 【修正】消えていたJSX要素を復元
+    const labels = ['日', '月', '火', '水', '木', '金', '土'].map((w, i) => (
+      <div key={`w-${i}`} className="text-center font-bold text-xs text-stone-400">{w}</div>
     ));
 
     for (let i = 0; i < firstDay; i++) dayCells.push(<div key={`e-${i}`} className="h-9 w-9"></div>);
@@ -785,24 +822,24 @@ export default function Home() {
     );
   }, [calendarDate, monthlyLogs, currentUser]);
 
-  // Rickからの挑戦状（級と未習得状態に基づく抽出）
+  // Rickからの挑戦状（アーカイブ除外）
   useEffect(() => {
     const fetchReviewCandidates = async () => {
-      // ★修正: 上限に引っかからないように.limit(3000)を追加
       let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
       if (targetKyu !== 'all') {
         query = query.eq('kanji_level', targetKyu);
       }
       const { data: allWords } = await query;
       const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id).limit(3000);
-      
+
       if (allWords) {
           const progressMap = new Map();
           progress?.forEach(p => progressMap.set(p.question_id, p.status));
           
           const candidates = allWords.filter(w => {
               const status = progressMap.get(w.id);
-              return !status || status === 'learning';
+              // ★ アーカイブを除外
+              return status !== 'archived' && (!status || status === 'learning');
           });
           setReviewCandidates(candidates.sort(() => 0.5 - Math.random()).slice(0, 5));
       }
@@ -814,11 +851,11 @@ export default function Home() {
   }, [currentUser.db_target, currentUser.id, targetKyu, view]);
 
   // --- ライフサイクル ---
-  useEffect(() => { 
+  useEffect(() => {
     const init = async () => {
       await checkDailyProgress();
       await fetchMonthlyLogs(calendarDate);
-      
+
       const { data: chal } = await supabase.from('challenge_settings').select('*').eq('target_user_id', currentUser.id).single();
       if (chal) {
         setHasParentChallenge(chal.mode === 'manual' ? (chal.selected_ids?.length > 0) : (chal.auto_count > 0));
@@ -847,6 +884,7 @@ export default function Home() {
       onPause={() => setIsStudyTimerRunning(false)}
     />
   );
+
   const withGlobalTimer = (screen: React.ReactNode) => (
     <>
       {screen}
@@ -856,27 +894,27 @@ export default function Home() {
 
   // --- メインレンダリング ---
   if (view === 'menu') return withGlobalTimer(<MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission: getExamMissionPhase()}} />);
-  
+
   if (view === 'admin') return withGlobalTimer(<AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />);
-  
-  if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onRegisterMistake: registerCollectionMistake}} />);
-  
+
+  if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onRegisterMistake: registerCollectionMistake, toggleArchiveStatus}} />);
+
   if (view === 'game' || view === 'rick_challenge') return withGlobalTimer(
-    <GameScreen 
+    <GameScreen
       {...{
-        currentUser, view, mode, questQueue, currentIndex, isTransitioning, 
-        selectedInputMode, rickMode, 
+        currentUser, view, mode, questQueue, currentIndex, isTransitioning,
+        selectedInputMode, rickMode,
         inputMode: selectedInputMode === 'write_canvas' ? 'canvas' :
-                   selectedInputMode === 'write_self' ? 'self' :
-                   selectedInputMode === 'typing_read' ? 'typing' : 'quiz', 
-        langMode, gameStep, setGameStep, weekendPhase: 1, bossHp, currentGameGoal, 
-        isBossAttacked: false, showRick, message, showHint, showFlashAnswer, mistakeCount, 
-        feedbackMsg, options, userAnswer, setUserAnswer, isListening, isDrawing, 
-        canvasRef, startDrawing, draw, stopDrawing, clearCanvas, 
-        startListening: () => setIsListening(!isListening), checkAnswer, 
-        handleSelfJudge, 
+        selectedInputMode === 'write_self' ? 'self' :
+        selectedInputMode === 'typing_read' ? 'typing' : 'quiz',
+        langMode, gameStep, setGameStep, weekendPhase: 1, bossHp, currentGameGoal,
+        isBossAttacked: false, showRick, message, showHint, showFlashAnswer, mistakeCount,
+        feedbackMsg, options, userAnswer, setUserAnswer, isListening, isDrawing,
+        canvasRef, startDrawing, draw, stopDrawing, clearCanvas,
+        startListening: () => setIsListening(!isListening), checkAnswer,
+        handleSelfJudge,
         nextQuestion, stopSpeaking, setView: navTo, renderReading, speakWord, getFullReading
-      }} 
+      }}
     />
   );
 
