@@ -31,6 +31,7 @@ type AdminScreenProps = {
   setEditStreak: (num: number) => void;
   handleSaveStreak: () => void;
   handleAddWord: (newWordData: any) => void;
+  handleUpdateWord: (id: number, updatedData: any) => void; // ★追加
   allWordsList: any[];
   toggleMasterStatus: (id: number, currentStatus: string) => void;
   handleDeleteWord: (id: number) => void;
@@ -45,13 +46,17 @@ export default function AdminScreen(props: AdminScreenProps) {
     setView, adminTargetUser, setAdminTargetUser, fetchAdminStats,
     fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings,
     saveChallengeSettings, sendLineToChild, editStreak, setEditStreak,
-    handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus,
+    handleSaveStreak, handleAddWord, handleUpdateWord, allWordsList, toggleMasterStatus,
     handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar
   } = props;
 
   const [adminTab, setAdminTab] = useState<'stats' | 'challenge' | 'add_word' | 'manage'>('stats');
   const [showAllWeakWords, setShowAllWeakWords] = useState(false);
   const [newWord, setNewWord] = useState({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: 'kyu10', stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' });
+
+  // ★追加：検索と編集モーダル用のステート
+  const [manageSearchQuery, setManageSearchQuery] = useState('');
+  const [editingWord, setEditingWord] = useState<any>(null);
 
   const matchingLogs = selectedLogDate ? monthlyLogs.filter(l => l.date === selectedLogDate) : [];
   const [selectedLog] = matchingLogs;
@@ -68,8 +73,7 @@ export default function AdminScreen(props: AdminScreenProps) {
       alert("使えるストックがありません！");
       return;
     }
-    // 【修正】バッククオートを追加
-    if (!confirm(`「${rText}」を1つ使いますか？\n（ストックが1つ減ります）`)) return;if (!confirm(`「${rText}」を1つ使いますか？\n（ストックが1つ減ります）`)) return;
+    if (!confirm(`「${rText}」を1つ使いますか？\n（ストックが1つ減ります）`)) return;
 
     const newOwned = owned - 1;
     const { supabase } = await import('@/lib/supabaseClient');
@@ -83,11 +87,16 @@ export default function AdminScreen(props: AdminScreenProps) {
     }
   };
 
+  // ★追加：検索フィルタリング
+  const filteredManageWords = allWordsList.filter(w => 
+    w.kanji.includes(manageSearchQuery) || 
+    w.reading.includes(manageSearchQuery) ||
+    (w.usage_example && w.usage_example.includes(manageSearchQuery))
+  );
+
   return (
-    // 【修正】React要素を一つにまとめるための親divを追加
     <div className="min-h-screen bg-stone-50 font-sans p-4 md:p-8 pb-24 text-center">
       
-      {/* 【修正】タグが消失していたモーダル部分を復元 */}
       {selectedLogDate && (
         <div className="fixed inset-0 bg-stone-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedLogDate(null)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl relative" onClick={e => e.stopPropagation()}>
@@ -110,6 +119,43 @@ export default function AdminScreen(props: AdminScreenProps) {
             <button onClick={() => setSelectedLogDate(null)} className="w-full bg-stone-800 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all">
               閉じる
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ★追加：編集モーダル */}
+      {editingWord && (
+        <div className="fixed inset-0 bg-stone-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setEditingWord(null)}>
+          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-2xl relative text-left" onClick={e => e.stopPropagation()}>
+            <h3 className="font-black text-indigo-700 mb-6 text-xl">📝 言葉の編集</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <input className="border-2 border-stone-200 p-4 rounded-2xl font-black text-2xl outline-none focus:border-indigo-400 bg-stone-50" placeholder="漢字" value={editingWord.kanji} onChange={e => setEditingWord({...editingWord, kanji: e.target.value})} />
+                <input className="border-2 border-stone-200 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50" placeholder="読み" value={editingWord.reading} onChange={e => setEditingWord({...editingWord, reading: e.target.value})} />
+              </div>
+              <select className="w-full border-2 border-stone-200 p-4 rounded-2xl font-bold bg-stone-50 outline-none focus:border-indigo-400" value={editingWord.kanji_level} onChange={e => setEditingWord({...editingWord, kanji_level: e.target.value})}>
+                {CATEGORIES.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <textarea className="w-full border-2 border-stone-200 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 min-h-[100px]" placeholder="例文" value={editingWord.usage_example || ''} onChange={e => setEditingWord({...editingWord, usage_example: e.target.value})} />
+              
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setEditingWord(null)} className="flex-1 bg-stone-200 text-stone-600 py-4 rounded-2xl font-black shadow-sm">キャンセル</button>
+                <button 
+                  onClick={() => {
+                    handleUpdateWord(editingWord.id, {
+                      kanji: editingWord.kanji,
+                      reading: editingWord.reading,
+                      kanji_level: editingWord.kanji_level,
+                      usage_example: editingWord.usage_example
+                    });
+                    setEditingWord(null);
+                  }} 
+                  className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-xl"
+                >
+                  保存する
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -356,40 +402,60 @@ export default function AdminScreen(props: AdminScreenProps) {
 
           {adminTab === 'manage' && (
             <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 text-left">
-              <div className="flex items-center justify-between mb-6 px-2">
-                <h3 className="font-black text-slate-700 text-xl flex items-center gap-2">📝 編集・削除</h3>
-                <span className="text-[10px] font-black text-stone-400 bg-stone-100 px-3 py-1 rounded-full">全 {allWordsList.length} 件</span>
+              <div className="flex flex-col gap-4 mb-6">
+                <div className="flex items-center justify-between px-2">
+                  <h3 className="font-black text-slate-700 text-xl flex items-center gap-2">📝 編集・削除</h3>
+                  <span className="text-[10px] font-black text-stone-400 bg-stone-100 px-3 py-1 rounded-full">全 {allWordsList.length} 件</span>
+                </div>
+                {/* ★追加：検索バー */}
+                <input 
+                  type="text" 
+                  placeholder="漢字・読み・例文で検索..." 
+                  value={manageSearchQuery}
+                  onChange={(e) => setManageSearchQuery(e.target.value)}
+                  className="w-full border-2 border-stone-200 rounded-xl p-3 font-bold bg-stone-50 outline-none focus:border-sky-400"
+                />
               </div>
+
               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 no-scrollbar">
-                {allWordsList.map((w: any) => {
+                {filteredManageWords.length > 0 ? filteredManageWords.map((w: any) => {
                   const category = CATEGORIES.find((c: any) => c.id === w.kanji_level);
                   const nParts = category?.name?.split('(') || [];
                   const [shortName] = nParts;
                   const displayName = shortName || w.kanji_level;
                   return (
-                    <div key={w.id} className="bg-stone-50/50 rounded-2xl p-4 border-2 border-stone-50 shadow-sm flex items-center gap-4 group hover:border-sky-100 transition-all">
-                      <div className="text-3xl grayscale group-hover:grayscale-0 transition-all drop-shadow-sm">{w.emoji || '📝'}</div>
-                      
-                      <div className="flex-1 min-w-0 text-left">
-                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                            <span className={`font-black text-lg truncate ${w.currentStatus === 'archived' ? 'text-stone-400 line-through' : 'text-sky-700'}`}>{w.kanji}</span>
-                            <span className="text-[9px] px-2 py-0.5 bg-white border border-stone-100 rounded-lg font-black text-stone-400 uppercase tracking-tighter">{displayName}</span>
-                            {w.currentStatus === 'archived' && (
-                              <span className="text-[9px] px-2 py-0.5 bg-stone-700 text-stone-100 rounded-lg font-black shadow-sm">📦 アーカイブ済</span>
-                            )}
-                         </div>
-                         <p className="text-xs font-bold text-stone-500 truncate">{w.reading}</p>
+                    <div key={w.id} className="bg-stone-50/50 rounded-2xl p-4 border-2 border-stone-50 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 group hover:border-sky-100 transition-all">
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="text-3xl grayscale group-hover:grayscale-0 transition-all drop-shadow-sm">{w.emoji || '📝'}</div>
+                        
+                        <div className="flex-1 min-w-0 text-left">
+                           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                              <span className={`font-black text-lg truncate ${w.currentStatus === 'archived' ? 'text-stone-400 line-through' : 'text-sky-700'}`}>{w.kanji}</span>
+                              <span className="text-[9px] px-2 py-0.5 bg-white border border-stone-100 rounded-lg font-black text-stone-400 uppercase tracking-tighter">{displayName}</span>
+                              {w.currentStatus === 'archived' && (
+                                <span className="text-[9px] px-2 py-0.5 bg-stone-700 text-stone-100 rounded-lg font-black shadow-sm">📦 アーカイブ</span>
+                              )}
+                           </div>
+                           <p className="text-xs font-bold text-stone-500 truncate">{w.reading}</p>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-end gap-2 mt-2 sm:mt-0">
                          <button onClick={() => toggleMasterStatus(w.id, w.currentStatus)} className={`px-4 py-2 rounded-xl text-[10px] font-black shadow-sm transition-all border-b-2 active:translate-y-0.5 active:border-b-0 ${w.currentStatus === 'gold' ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-white text-stone-300 border-stone-100'}`}>
                            {w.currentStatus === 'gold' ? '👑 解除' : '👑 習得'}
                          </button>
-                         <button onClick={() => handleDeleteWord(w.id)} className="bg-white text-rose-400 p-2 rounded-xl border border-rose-50 hover:bg-rose-100 hover:text-rose-500 transition-all shadow-sm">削除</button>
+                         {/* ★追加：編集ボタン */}
+                         <button onClick={() => setEditingWord(w)} className="bg-white text-indigo-500 p-2 rounded-xl border border-indigo-50 hover:bg-indigo-50 transition-all shadow-sm font-bold text-xs">編集</button>
+                         <button onClick={() => handleDeleteWord(w.id)} className="bg-white text-rose-400 p-2 rounded-xl border border-rose-50 hover:bg-rose-100 hover:text-rose-500 transition-all shadow-sm font-bold text-xs">削除</button>
                       </div>
                     </div>
                   )
-                })}
+                }) : (
+                  <div className="text-center py-10 text-stone-400 font-bold">
+                    <p className="text-3xl mb-2">🔎</p>
+                    見つかりませんでした
+                  </div>
+                )}
               </div>
             </div>
           )}

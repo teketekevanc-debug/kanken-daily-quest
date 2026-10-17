@@ -34,10 +34,10 @@ export default function Home() {
   // --- 基本ステート ---
   const [currentUser, setCurrentUser] = useState(defaultUser)
   const [view, setView] = useState<'menu'|'game'|'rick_challenge'|'result'|'admin'|'collection'>('menu')
-  const [mode, setMode] = useState<'daily'|'free'|'weekend'|'parent_challenge'|'rick_challenge'|'revenge'|'mission_100'>('daily')
+  const [mode, setMode] = useState<'daily'|'free'|'weekend'|'parent_challenge'|'rick_challenge'|'revenge'|'mission_100'|'exam'>('daily')
   const [loading, setLoading] = useState(false);
   const [targetKyu, setTargetKyu] = useState('kyu6')
-  const [selectedInputMode, setSelectedInputMode] = useState<'quiz_kanji'|'typing_read'|'write_canvas'|'write_self'>('quiz_kanji')
+  const [selectedInputMode, setSelectedInputMode] = useState<'quiz_kanji'|'typing_read'|'write_canvas'|'write_self'>('write_canvas')
   const [rickMode, setRickMode] = useState<'read'|'think'|'write'>('read')
   const [adminTargetUser, setAdminTargetUser] = useState(defaultUser)
   const [allWordsList, setAllWordsList] = useState<any[]>([]);
@@ -50,7 +50,6 @@ export default function Home() {
   const [monthlyLogs, setMonthlyLogs] = useState<any[]>([]);
   const [stats, setStats] = useState<ProgressStats | null>(null)
 
-  // Rickの挑戦状（復習カード）用ステート
   const [reviewCandidates, setReviewCandidates] = useState<KanjiWord[]>([])
   const [reviewRevealed, setReviewRevealed] = useState<number[]>([]);
 
@@ -105,11 +104,9 @@ export default function Home() {
     audio.play().catch(()=>{});
   }, []);
 
-  // 【修正】バッククオートを追加
   const getFullReading = useCallback((reading: string, okurigana?: string | null) =>
     okurigana ? `${reading}${okurigana}` : reading, []);
 
-  // 【修正】消えていたJSX要素を復元
   const renderReading = useCallback((reading: string, okurigana?: string | null) => {
     if (!okurigana) return <span>{reading}</span>;
     return (
@@ -142,7 +139,6 @@ export default function Home() {
     }
   }, [adminTargetUser]);
 
-  // --- ★ アーカイブ切り替え ---
   const toggleArchiveStatus = useCallback(async (id: number, currentStatus: string) => {
     const newStatus = currentStatus === 'archived' ? 'gold' : 'archived';
     const { error } = await supabase
@@ -162,7 +158,6 @@ export default function Home() {
     }
   }, [currentUser, fetchAllWordsForEdit]);
 
-  // --- データ取得ロジック ---
   const checkDailyProgress = useCallback(async () => {
     const today = getTodayJST();
     const yesterday = getYesterdayJST();
@@ -183,7 +178,6 @@ export default function Home() {
   const fetchMonthlyLogs = useCallback(async (targetDate: Date, userId: string = currentUser.id) => {
     const y = targetDate.getFullYear();
     const m = targetDate.getMonth();
-    // 【修正】バッククオートを追加
     const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
     const last = `${y}-${String(m + 1).padStart(2, '0')}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, '0')}`;
     const { data } = await supabase.from('daily_logs').select('*').eq('user_id', userId).gte('date', first).lte('date', last);
@@ -200,7 +194,6 @@ export default function Home() {
     const ranks = { learning: 0, bronze: 0, silver: 0, gold: 0 };
     let weakList: any[] = [];
     progress?.forEach((p: any) => {
-      // 【修正】配列の分割代入の構文エラーを修正
       const wd = Array.isArray(p.kanji_questions) ? p.kanji_questions[0] : p.kanji_questions;
       if (p.status === 'gold' || p.status === 'mastered') ranks.gold++; 
       else if (p.status === 'silver') ranks.silver++; 
@@ -241,7 +234,6 @@ export default function Home() {
     setLoading(false);
   }, [calendarDate, fetchMonthlyLogs, getFullReading]);
 
-  // 【追加】未定義だった関数をダミーで定義
   const sendLineToChild = useCallback(() => {
     alert("LINE送信機能は現在準備中です");
   }, []);
@@ -270,6 +262,15 @@ export default function Home() {
       fetchAllWordsForEdit();
     }
   }, [adminTargetUser.db_target, fetchAllWordsForEdit]);
+
+  const handleUpdateWord = useCallback(async (id: number, updatedData: any) => {
+    const { error } = await supabase.from('kanji_questions').update(updatedData).eq('id', id);
+    if (error) alert("更新に失敗しました: " + error.message);
+    else {
+      alert('単語を更新しました！');
+      fetchAllWordsForEdit();
+    }
+  }, [fetchAllWordsForEdit]);
 
   const toggleMasterStatus = useCallback(async (id: number, currentStatus: string) => {
     if (currentStatus === 'gold') {
@@ -419,13 +420,11 @@ export default function Home() {
     return () => window.clearInterval(timer);
   }, [isStudyTimerRunning, saveCompletedStudyTimer, view]);
 
-  // --- ゲームロジック ---
   const prepareQuestion = useCallback((word: KanjiWord, availableWords: KanjiWord[]) => {
     setUserAnswer(''); setMessage(''); setShowRick(false); setMistakeCount(0);
     setFeedbackMsg(null); setIsProcessing(false); setIsTransitioning(false);
     setShowHint(false); setShowFlashAnswer(false);
 
-    // 手書き・自己判定用のステートとキャンバスをリセット
     setGameStep(0);
     if (canvasRef.current) {
       const ctx = canvasRef.current.getContext('2d');
@@ -445,6 +444,11 @@ export default function Home() {
     setOpenedChests([]);
     setMistakeCount(0);
 
+    // ★ 合格ミッションと受験モードは手書きモードを強制
+    if (selectedMode === 'mission_100' || selectedMode === 'exam') {
+        setSelectedInputMode('write_canvas');
+    }
+
     const examMission = getExamMissionPhase();
     if (selectedMode === 'mission_100' && !examMission.isActive) {
       alert(examMission.phase === 0
@@ -458,14 +462,19 @@ export default function Home() {
     setCurrentGameGoal(limit);
 
     let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
-    if (selectedMode !== 'mission_100' && targetKyu !== 'all') {
+    
+    // ★ mistakes と hard は kanji_level の絞り込みから外す
+    if (selectedMode !== 'mission_100' && selectedMode !== 'exam' && targetKyu !== 'all' && targetKyu !== 'mistakes' && targetKyu !== 'hard') {
       query = query.eq('kanji_level', targetKyu);
     }
     const { data: allW } = await query;
     const { data: progress } = await supabase.from('user_progress').select('question_id, status, mistake_count').eq('user_id', currentUser.id).limit(3000);
 
+    const statusMap = new Map(progress?.map(p => [p.question_id, p.status]));
+    const mistakeMap = new Map(progress?.map(p => [p.question_id, p.mistake_count || 0]));
+
     if (!allW?.length) { 
-      alert(`選んだ級（${targetKyu}）の単語がまだないワン！🐶`);
+      alert(`該当する単語が見つからないワン！🐶`);
       setLoading(false); 
       return; 
     }
@@ -473,7 +482,26 @@ export default function Home() {
     let queue;
     let availableWordsForOptions = allW;
 
-    if (selectedMode === 'mission_100') {
+    if (selectedMode === 'exam') {
+        const activeWords = allW.filter(w => statusMap.get(w.id) !== 'archived' && (mistakeMap.get(w.id) || 0) > 0);
+
+        if (!activeWords.length) {
+            alert("間違えた漢字がまだないワン！すごい！🐶✨");
+            setLoading(false);
+            return;
+        }
+
+        setCachedAllWords(activeWords);
+        availableWordsForOptions = activeWords;
+
+        queue = [...activeWords].sort((a, b) => {
+            const mistakesA = mistakeMap.get(a.id) || 0;
+            const mistakesB = mistakeMap.get(b.id) || 0;
+            if (mistakesA !== mistakesB) return mistakesB - mistakesA;
+            return 0.5 - Math.random();
+        }).slice(0, limit);
+
+    } else if (selectedMode === 'mission_100') {
       const phaseWords = allW.filter((word) => examMission.categoryIds.includes(word.kanji_level));
       const missionWords = phaseWords.length > 0 ? phaseWords : allW;
       const progressMap = new Map(progress?.map((entry) => [entry.question_id, entry]));
@@ -499,12 +527,17 @@ export default function Home() {
       availableWordsForOptions = missionWords;
 
     } else {
-      // ★ アーカイブ除外・優先順位ロジック
-      const statusMap = new Map(progress?.map(p => [p.question_id, p.status]));
-      const activeWords = allW.filter(w => statusMap.get(w.id) !== 'archived');
+      let activeWords = allW.filter(w => statusMap.get(w.id) !== 'archived');
+
+      // ★ targetKyu が mistakes または hard の場合の追加フィルタリング
+      if (targetKyu === 'mistakes') {
+          activeWords = activeWords.filter(w => (mistakeMap.get(w.id) || 0) > 0 || w.kanji_level === 'mistakes');
+      } else if (targetKyu === 'hard') {
+          activeWords = activeWords.filter(w => (mistakeMap.get(w.id) || 0) >= 2);
+      }
 
       if (!activeWords.length) {
-          alert("出題できる問題がないワン！🐶（すべてアーカイブされています）");
+          alert("出題できる問題がないワン！🐶");
           setLoading(false);
           return;
       }
@@ -557,7 +590,7 @@ export default function Home() {
     const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).limit(1).single();
 
     const [curWord] = questQueue.slice(currentIndex);
-    const nEntry = { time: getJSTTimeString(), word: curWord?.kanji, mode: MODE_NAMES[mode], result: correct ? 'correct' : 'incorrect' };
+    const nEntry = { time: getJSTTimeString(), word: curWord?.kanji, mode: MODE_NAMES[mode] || '受験モード', result: correct ? 'correct' : 'incorrect' };
 
     const nT = (cLog?.study_time_seconds || 0) + pendingTimeRef.current;
     const nV = (cLog?.collection_views || 0) + pendingViewsRef.current;
@@ -680,7 +713,7 @@ export default function Home() {
             const today = getTodayJST();
             const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).single();
             if (cLog) {
-                const doneEntry = { time: getJSTTimeString(), word: 'ALL CLEAR', mode: MODE_NAMES[mode] || mode, result: 'done' };
+                const doneEntry = { time: getJSTTimeString(), word: 'ALL CLEAR', mode: MODE_NAMES[mode] || '受験モード', result: 'done' };
                 await supabase.from('daily_logs').update({ details: [...(cLog.details || []), doneEntry] }).eq('id', cLog.id);
                 setDailyProgress((prev: any) => ({ ...prev, details: [...(prev.details || []), doneEntry] }));
             }
@@ -712,7 +745,6 @@ export default function Home() {
     setIsTransitioning(false);
   }, [currentIndex, questQueue, cachedAllWords, dailyProgress, mode, currentUser, prepareQuestion, stopSpeaking, selectedInputMode, playSound, challengeSettings]);
 
-  // --- 自己判定ハンドラー ---
   const handleSelfJudge = async (isCorrect: boolean) => {
     if (isProcessing) return;
     setIsProcessing(true);
@@ -731,7 +763,6 @@ export default function Home() {
     setIsProcessing(false);
   };
 
-  // --- キャンバス描画ハンドラー ---
   const startDrawing = useCallback((e: React.PointerEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -784,7 +815,6 @@ export default function Home() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
 
-  // --- カレンダー描画 ---
   const renderCalendar = useCallback(() => {
     const y = calendarDate.getFullYear();
     const m = calendarDate.getMonth();
@@ -792,7 +822,6 @@ export default function Home() {
     const firstDay = new Date(y, m, 1).getDay();
     const dayCells = [];
     
-    // 【修正】消えていたJSX要素を復元
     const labels = ['日', '月', '火', '水', '木', '金', '土'].map((w, i) => (
       <div key={`w-${i}`} className="text-center font-bold text-xs text-stone-400">{w}</div>
     ));
@@ -822,7 +851,6 @@ export default function Home() {
     );
   }, [calendarDate, monthlyLogs, currentUser]);
 
-  // Rickからの挑戦状（アーカイブ除外）
   useEffect(() => {
     const fetchReviewCandidates = async () => {
       let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
@@ -838,7 +866,6 @@ export default function Home() {
           
           const candidates = allWords.filter(w => {
               const status = progressMap.get(w.id);
-              // ★ アーカイブを除外
               return status !== 'archived' && (!status || status === 'learning');
           });
           setReviewCandidates(candidates.sort(() => 0.5 - Math.random()).slice(0, 5));
@@ -850,7 +877,6 @@ export default function Home() {
     }
   }, [currentUser.db_target, currentUser.id, targetKyu, view]);
 
-  // --- ライフサイクル ---
   useEffect(() => {
     const init = async () => {
       await checkDailyProgress();
@@ -892,10 +918,9 @@ export default function Home() {
     </>
   );
 
-  // --- メインレンダリング ---
   if (view === 'menu') return withGlobalTimer(<MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission: getExamMissionPhase()}} />);
 
-  if (view === 'admin') return withGlobalTimer(<AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />);
+  if (view === 'admin') return withGlobalTimer(<AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, handleUpdateWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />);
 
   if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onRegisterMistake: registerCollectionMistake, toggleArchiveStatus}} />);
 

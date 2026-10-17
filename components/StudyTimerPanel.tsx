@@ -20,7 +20,7 @@ export default function StudyTimerPanel({
   const seconds = elapsedSeconds % 60;
 
   return (
-    <div className="fixed right-3 top-3 z-60 flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white/95 py-1.5 pl-2.5 pr-1.5 shadow-md backdrop-blur-sm" title="1日10分学習タイマー">
+    <div className="fixed left-4 top-20 z-50 flex items-center gap-1.5 rounded-full border border-emerald-200/50 bg-white/40 py-1.5 pl-2.5 pr-1.5 shadow-sm backdrop-blur-md" title="1日10分学習タイマー">
       <span className={`h-2 w-2 rounded-full ${isComplete ? 'bg-amber-400' : isRunning && isStudyAreaActive ? 'bg-emerald-500 animate-pulse' : 'bg-stone-300'}`} />
       <span className="min-w-14 text-center font-mono text-sm font-black tabular-nums text-stone-700" aria-live="polite">
         {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
@@ -28,7 +28,7 @@ export default function StudyTimerPanel({
         <button
           onClick={isRunning ? onPause : onStart}
           aria-label={isRunning ? '10分タイマーを一時停止' : isComplete ? '10分タイマーをリセットして開始' : '10分タイマーを開始'}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-black text-white transition active:scale-90"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600/90 text-xs font-black text-white transition active:scale-90 hover:bg-emerald-600"
         >
           {isRunning ? 'Ⅱ' : isComplete ? '↻' : '▶'}
         </button>

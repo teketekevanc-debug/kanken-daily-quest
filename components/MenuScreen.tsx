@@ -42,26 +42,23 @@ export default function MenuScreen(props: MenuScreenProps) {
   const [showTipsModal, setShowTipsModal] = useState(false);
   const [tipSearchQuery, setTipSearchQuery] = useState('');
   
-  // ★ 漢字リストモーダル用のステート
   const [showKanjiList, setShowKanjiList] = useState(false);
   const [kanjiList, setKanjiList] = useState<any[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
-  const [listTab, setListTab] = useState<'learning' | 'mastered'>('learning'); // ★ 追加: タブ管理
+  const [listTab, setListTab] = useState<'learning' | 'mastered'>('learning');
 
-  // ★ 漢字リストを取得して開く関数（進捗ステータスも取得）
   const openKanjiList = async () => {
     setShowKanjiList(true);
     setIsLoadingList(true);
-    setListTab('learning'); // 開く時は常に「未習得」タブから
+    setListTab('learning');
 
     let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
     if (targetKyu !== 'all') {
       query = query.eq('kanji_level', targetKyu);
     }
-    query = query.order('id', { ascending: true }); // ID順にソート
+    query = query.order('id', { ascending: true }); 
     
     const { data: words } = await query;
-    // 進捗データも取得して結合する
     const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id).limit(3000);
 
     if (words) {
@@ -73,15 +70,12 @@ export default function MenuScreen(props: MenuScreenProps) {
     setIsLoadingList(false);
   };
 
-  // ★ 「覚えた！」ボタンを押した時の処理
   const handleToggleRemembered = async (word: any) => {
     const isMastered = word.currentStatus === 'gold';
     const newStatus = isMastered ? 'learning' : 'gold';
 
-    // 画面上のリストを即座に更新（サクサク操作できるように）
     setKanjiList(prev => prev.map(w => w.id === word.id ? { ...w, currentStatus: newStatus } : w));
 
-    // データベースの更新
     if (isMastered) {
       await supabase.from('user_progress').delete().eq('user_id', currentUser.id).eq('question_id', word.id);
     } else {
@@ -122,7 +116,6 @@ export default function MenuScreen(props: MenuScreenProps) {
   const displayCountData = [challengeSettings?.quest_count || 5];
   const [displayCount] = displayCountData;
 
-  // 受験日（2027年2月1日）までのカウントダウン
   const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
   const today = getJSTDate();
   today.setHours(0, 0, 0, 0);
@@ -133,7 +126,7 @@ export default function MenuScreen(props: MenuScreenProps) {
   return (
     <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans transition-colors duration-500`}>
       
-      <div className="absolute top-4 left-4 flex flex-wrap justify-start gap-2 max-w-[55%]">
+      <div className="absolute top-4 left-4 flex flex-wrap justify-start gap-2 max-w-[55%] z-10">
         {USERS.map((u: any) => (
           <button key={u.id} onClick={() => setCurrentUser(u)} className={`px-3 py-1.5 rounded-full text-xs font-black transition-all shadow-sm ${currentUser.id === u.id ? `bg-gradient-to-r ${u.hue} text-white scale-110 ring-2 ring-white/50` : 'bg-white/50 text-stone-500 opacity-90 hover:bg-white'}`}>
             {getUserFirstName(u.name)}
@@ -154,7 +147,6 @@ export default function MenuScreen(props: MenuScreenProps) {
         <span className="text-xl">📖</span> 1日10分カード
       </button>
       
-      {/* 受験カウントダウン */}
       <div className="w-full max-w-sm bg-gradient-to-r from-rose-50 to-orange-50 border-4 border-rose-200 p-4 rounded-3xl shadow-sm mb-4 flex items-center justify-between relative overflow-hidden">
         <div className="absolute -right-4 -bottom-4 text-7xl opacity-20">🔥</div>
         <div className="relative z-10">
@@ -202,6 +194,11 @@ export default function MenuScreen(props: MenuScreenProps) {
           {examMission.phase === 0 ? `特訓開始まであと${examMission.daysUntilStart}日` : examMission.phase === 4 ? '100日特訓期間終了' : '今日の合格ミッションを始める'}
         </button>
       </section>
+
+      {/* ★ 移動：受験モード（手書き弱点特訓）を合格ミッションの直下に配置 */}
+      <button onClick={() => startGame('exam')} className="mb-6 w-full max-w-sm py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-rose-600 text-white border-b-4 border-rose-800 hover:bg-rose-500 active:translate-y-1 active:border-b-0 tracking-widest gap-2">
+        <span className="text-xl">🔥</span> 受験モード (手書き弱点特訓)
+      </button>
 
       <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">
           <div className="flex items-center justify-between mb-3">
@@ -347,9 +344,13 @@ export default function MenuScreen(props: MenuScreenProps) {
           {isWeekendDone && <span className="bg-white/30 px-3 py-1 rounded-full text-xs">撃破済</span>}
         </button>
 
-        <button onClick={() => startGame('revenge')} className="w-full py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-stone-800 text-rose-400 border-b-4 border-stone-900 hover:bg-stone-700 active:translate-y-1 active:border-b-0 tracking-widest gap-2"><span className="text-xl">💀</span> リベンジ (無限復習)</button>
+        <button onClick={() => startGame('revenge')} className="w-full py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-stone-800 text-rose-400 border-b-4 border-stone-900 hover:bg-stone-700 active:translate-y-1 active:border-b-0 tracking-widest gap-2">
+          <span className="text-xl">💀</span> リベンジ (無限復習)
+        </button>
 
-        <button onClick={() => startGame('free')} className="mt-4 w-full bg-white border-b-4 border-sky-400 text-sky-500 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50"><span className="text-xl">⚔️</span> フリー</button>
+        <button onClick={() => startGame('free')} className="mt-4 w-full bg-white border-b-4 border-sky-400 text-sky-500 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50">
+          <span className="text-xl">⚔️</span> フリー
+        </button>
       </div>
 
       <div className="mb-6 w-full max-w-sm">{renderCalendar()}</div>
@@ -370,7 +371,6 @@ export default function MenuScreen(props: MenuScreenProps) {
         </button>
       )}
 
-      {/* ★ 漢字リストモーダル（タブ切り替え対応） */}
       {showKanjiList && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in" onClick={() => setShowKanjiList(false)}>
           <div className="bg-white w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
@@ -383,7 +383,6 @@ export default function MenuScreen(props: MenuScreenProps) {
               <button onClick={() => setShowKanjiList(false)} className="bg-white text-sky-400 w-10 h-10 rounded-full font-black text-xl shadow-sm active:scale-90 transition border border-sky-100">✕</button>
             </div>
 
-            {/* ★ タブ切り替えボタン */}
             <div className="flex p-2 bg-stone-100 shrink-0 gap-2">
               <button onClick={() => setListTab('learning')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'learning' ? 'bg-white text-sky-700 shadow-sm border-2 border-sky-100' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
                 未習得 ({kanjiList.filter(w => w.currentStatus !== 'gold').length})
@@ -409,7 +408,6 @@ export default function MenuScreen(props: MenuScreenProps) {
                       <p className="text-base font-black text-sky-700 mb-1">{renderReading(w.reading, w.okurigana)}</p>
                       {w.sentence && <p className="text-[10px] font-bold text-stone-500 leading-snug">{w.sentence.replace('□', '〇')}</p>}
                     </div>
-                    {/* ★ 覚えた/戻す 切り替えボタン */}
                     <button 
                       onClick={() => handleToggleRemembered(w)} 
                       className={`shrink-0 px-3 py-2 rounded-xl text-[10px] font-black transition-all border-b-2 active:translate-y-0.5 active:border-b-0 ${
