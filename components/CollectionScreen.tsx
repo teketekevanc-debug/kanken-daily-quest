@@ -55,7 +55,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
         if (tip.startsWith('[マイクラ] ')) return { type: 'minecraft', text: tip.replace('[マイクラ] ', '') };
         if (tip.startsWith('[スプラ] ')) return { type: 'splatoon', text: tip.replace('[スプラ] ', '') };
         
-        // ★ 過去データ（プレフィックスなし）の自動判定
         if (tip.includes('/') || tip.includes('@') || tip.includes('コマンド') || tip.includes('ブロック') || tip.includes('エンティティ')) {
             return { type: 'minecraft', text: tip };
         }
@@ -69,14 +68,12 @@ export default function CollectionScreen(props: CollectionScreenProps) {
     const filteredTips = unlockedTips
         .map((tip, index) => ({ tip, index, parsed: parseTip(tip) }))
         .filter((item) => {
-            // ★ 厳密なフィルタリング
             if (tipsTab === 'minecraft' && item.parsed.type !== 'minecraft') return false;
             if (tipsTab === 'splatoon' && item.parsed.type !== 'splatoon') return false;
             if (!item.parsed.text.toLocaleLowerCase().includes(tipSearchQuery.trim().toLocaleLowerCase())) return false;
             return true;
         })
         .sort((a: any, b: any) => {
-           // ★ ジャンルでソート（マイクラ -> スプラ -> その他）
            if (a.parsed.type < b.parsed.type) return -1;
            if (a.parsed.type > b.parsed.type) return 1;
            return a.index - b.index;
@@ -302,14 +299,14 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                           {filteredWords.map((w, index) => (
                             <div key={w.id} onClick={() => handleCardClick(w, index)} className="bg-white rounded-[2rem] p-3 border-b-4 border-stone-200 shadow-sm flex flex-col items-center justify-center relative aspect-square cursor-pointer active:scale-95 transition-transform overflow-hidden">
                               <div className="text-2xl mb-1">{w.emoji}</div>
-                              <div className="relative w-full text-center">
-                                <span className="text-3xl font-black text-stone-800 leading-none block truncate">{w.kanji}</span>
+                              <div className="relative w-full text-center px-1">
+                                <span className="text-xl sm:text-2xl font-black text-stone-800 leading-tight block break-words whitespace-pre-wrap">{w.kanji}</span>
                                 {flashcardMode === 'hide_kanji' && !revealedCards.includes(w.id) && (
                                   <div className="absolute inset-0 bg-stone-800 rounded-xl flex items-center justify-center"><span className="text-white text-xl">?</span></div>
                                 )}
                               </div>
                               <div className="relative mt-2 w-full text-center">
-                                <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full inline-block truncate max-w-full">{w.reading}</span>
+                                <span className="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-1 rounded-2xl inline-block max-w-full break-words whitespace-normal leading-snug">{w.reading}</span>
                                 {flashcardMode === 'hide_reading' && !revealedCards.includes(w.id) && (
                                   <div className="absolute inset-0 bg-stone-600 rounded-full flex items-center justify-center w-[80%] mx-auto"><span className="text-white text-[9px]">?</span></div>
                                 )}
@@ -377,11 +374,11 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                           {filteredWords.map((w, index) => (
                             <div key={w.id} onClick={() => handleCardClick(w, index)} className="bg-stone-100 rounded-[2rem] p-3 border-b-4 border-stone-300 shadow-inner flex flex-col items-center justify-center relative aspect-square cursor-pointer active:scale-95 transition-transform overflow-hidden grayscale hover:grayscale-0">
                               <div className="text-2xl mb-1">{w.emoji}</div>
-                              <div className="relative w-full text-center">
-                                <span className="text-3xl font-black text-stone-400 block truncate">{w.kanji}</span>
+                              <div className="relative w-full text-center px-1">
+                                <span className="text-xl sm:text-2xl font-black text-stone-400 block break-words whitespace-pre-wrap">{w.kanji}</span>
                               </div>
                               <div className="relative mt-2 w-full text-center">
-                                <span className="text-[10px] font-bold text-stone-500 bg-stone-200 px-2 py-0.5 rounded-full inline-block truncate max-w-full">{w.reading}</span>
+                                <span className="text-[10px] font-bold text-stone-500 bg-stone-200 px-2 py-1 rounded-2xl inline-block max-w-full break-words whitespace-normal leading-snug">{w.reading}</span>
                               </div>
                             </div>
                           ))}
@@ -414,11 +411,11 @@ export default function CollectionScreen(props: CollectionScreenProps) {
 
                     <div className="min-w-0 flex-1 text-center px-1 sm:px-4 flex flex-col items-center animate-in zoom-in duration-300" key={selectedIndex}>
                     <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">{filteredWords[selectedIndex].emoji}</div>
-                    <h2 className="text-6xl sm:text-[8rem] md:text-[10rem] font-black text-stone-800 leading-none mb-4 sm:mb-6 drop-shadow-md">
+                    <h2 className="text-5xl sm:text-[8rem] md:text-[10rem] font-black text-stone-800 leading-none mb-4 sm:mb-6 drop-shadow-md break-words whitespace-pre-wrap max-w-full">
                       {flashcardMode === 'hide_kanji' && !isAnswerRevealed ? '？' : filteredWords[selectedIndex].kanji}
                     </h2>
                     <div className="flex max-w-full flex-wrap items-center justify-center gap-2 sm:gap-4 bg-sky-50 py-3 px-3 sm:px-8 rounded-full border-4 border-sky-100 shadow-sm">
-                      <p className="text-2xl sm:text-4xl md:text-5xl font-black leading-tight text-sky-700">
+                      <p className="text-2xl sm:text-4xl md:text-5xl font-black leading-tight text-sky-700 break-words whitespace-normal">
                         {flashcardMode === 'hide_reading' && !isAnswerRevealed ? '？？？' : renderReading(filteredWords[selectedIndex].reading, filteredWords[selectedIndex].okurigana)}
                       </p>
                       <button 

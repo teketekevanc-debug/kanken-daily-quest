@@ -44,13 +44,13 @@ export default function Home() {
   const [adminTargetUser, setAdminTargetUser] = useState(defaultUser)
   const [allWordsList, setAllWordsList] = useState<any[]>([]);
   const [selectedLogDate, setSelectedLogDate] = useState<string|null>(null);
-  const [editStreak, setEditStreak] = useState(0)
-  const [challengeSettings, setChallengeSettings] = useState({ mode: 'auto', selected_ids: [], auto_count: 5, quest_count: 5, special_quest_count: 10, challenge_quest_count: 8, reward_goal_days: 14, reward_text: '好きなおやつ', owned_rewards: 0, total_earned_rewards: 0, unlocked_tips: [] })
+  const [editStreak, setEditStreak] = useState(0);
+  const [challengeSettings, setChallengeSettings] = useState({ mode: 'auto', selected_ids: [] as number[], auto_count: 5, quest_count: 5, special_quest_count: 10, challenge_quest_count: 8, reward_goal_days: 14, reward_text: '好きなおやつ', owned_rewards: 0, total_earned_rewards: 0, unlocked_tips: [] as string[] });
   const [hasParentChallenge, setHasParentChallenge] = useState(false);
-  const [calendarDate, setCalendarDate] = useState(getJSTDate())
-  const [dailyProgress, setDailyProgress] = useState({ id: 0, date: getTodayJST(), count: 0, is_completed: false, study_time_seconds: 0, collection_views: 0, streak: 0, details: [] as any[] })
+  const [calendarDate, setCalendarDate] = useState(getJSTDate());
+  const [dailyProgress, setDailyProgress] = useState({ id: 0, date: getTodayJST(), count: 0, is_completed: false, study_time_seconds: 0, collection_views:0, streak: 0, details: [] as any[] });
   const [monthlyLogs, setMonthlyLogs] = useState<any[]>([]);
-  const [stats, setStats] = useState<ProgressStats | null>(null)
+    const [stats, setStats] = useState<ProgressStats | null>(null)
 
   const [reviewCandidates, setReviewCandidates] = useState<KanjiWord[]>([])
   const [reviewRevealed, setReviewRevealed] = useState<number[]>([]);
