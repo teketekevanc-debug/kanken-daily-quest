@@ -45,12 +45,12 @@ export default function Home() {
   const [allWordsList, setAllWordsList] = useState<any[]>([]);
   const [selectedLogDate, setSelectedLogDate] = useState<string|null>(null);
   const [editStreak, setEditStreak] = useState(0);
-  const [challengeSettings, setChallengeSettings] = useState({ mode: 'auto', selected_ids: [] as number[], auto_count: 5, quest_count: 5, special_quest_count: 10, challenge_quest_count: 8, reward_goal_days: 14, reward_text: '好きなおやつ', owned_rewards: 0, total_earned_rewards: 0, unlocked_tips: [] as string[] });
+  const [challengeSettings, setChallengeSettings] = useState({ mode: 'auto', selected_ids: [] as number[], auto_count: 5, quest_count: 5, special_quest_count: 10, challenge_quest_count: 8, reward_goal_days: 14, reward_text: '好きなおやつ', owned_rewards: 0, total_earned_rewards: 0, unlocked_tips: [] as string[], hidden_tips: [] as string[] });
   const [hasParentChallenge, setHasParentChallenge] = useState(false);
   const [calendarDate, setCalendarDate] = useState(getJSTDate());
   const [dailyProgress, setDailyProgress] = useState({ id: 0, date: getTodayJST(), count: 0, is_completed: false, study_time_seconds: 0, collection_views:0, streak: 0, details: [] as any[] });
   const [monthlyLogs, setMonthlyLogs] = useState<any[]>([]);
-    const [stats, setStats] = useState<ProgressStats | null>(null)
+  const [stats, setStats] = useState<ProgressStats | null>(null)
 
   const [reviewCandidates, setReviewCandidates] = useState<KanjiWord[]>([])
   const [reviewRevealed, setReviewRevealed] = useState<number[]>([]);
@@ -299,6 +299,18 @@ export default function Home() {
     else fetchAllWordsForEdit();
   }, [fetchAllWordsForEdit]);
 
+  const handleMarkAsMistake = useCallback(async (id: number) => {
+    setAllWordsList(prev => prev.map(w => w.id === id ? { ...w, mistakeCount: (w.mistakeCount || 0) + 1, currentStatus: 'learning' } : w));
+    const { data: pD } = await supabase.from('user_progress').select('mistake_count').eq('user_id', adminTargetUser.id).eq('question_id', id).maybeSingle();
+    await supabase.from('user_progress').upsert({
+      user_id: adminTargetUser.id,
+      question_id: id,
+      status: 'learning',
+      mistake_count: (pD?.mistake_count || 0) + 1,
+      last_reviewed_at: new Date().toISOString()
+    }, { onConflict: 'user_id, question_id' });
+  }, [adminTargetUser.id]);
+
   const updateCollectionSelfJudge = useCallback(async (word: KanjiWord, remembered: boolean) => {
     const status = remembered ? 'gold' : 'learning';
     const mistakeCount = ((word as any).mistakeCount || 0) + (remembered ? 0 : 1);
@@ -413,6 +425,16 @@ export default function Home() {
       setView('collection');
     }
   }, [currentUser, fetchAllWordsForEdit, view]);
+
+  // ★ 豆知識をごみ箱に入れる（非表示にする）処理
+  const toggleHideTip = async (tip: string, hide: boolean) => {
+    setChallengeSettings((prev: any) => {
+      const currentHidden = prev.hidden_tips || [];
+      const nextHidden = hide ? [...currentHidden, tip] : currentHidden.filter((t: string) => t !== tip);
+      supabase.from('challenge_settings').update({ hidden_tips: nextHidden }).eq('target_user_id', currentUser.id).then();
+      return { ...prev, hidden_tips: nextHidden };
+    });
+  };
 
   useEffect(() => {
     if (!isStudyTimerRunning || view !== 'collection') return;
@@ -933,9 +955,9 @@ export default function Home() {
 
   if (view === 'menu') return withGlobalTimer(<MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission: getExamMissionPhase(), openChestRoom}} />);
 
-  if (view === 'admin') return withGlobalTimer(<AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, handleUpdateWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />);
+  if (view === 'admin') return withGlobalTimer(<AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, handleUpdateWord, allWordsList, toggleMasterStatus, handleDeleteWord, handleMarkAsMistake, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />);
 
-  if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onRegisterMistake: registerCollectionMistake, toggleArchiveStatus}} />);
+  if (view === 'collection') return withGlobalTimer(<CollectionScreen {...{currentUser, setView: navTo, allWordsList, challengeSettings, speakWord, renderReading, getFullReading, stopSpeaking, onViewCard: () => { pendingViewsRef.current += 1; }, onSelfJudge: updateCollectionSelfJudge, onRegisterMistake: registerCollectionMistake, toggleArchiveStatus, toggleHideTip}} />);
 
   if (view === 'game' || view === 'rick_challenge') return withGlobalTimer(
     <GameScreen

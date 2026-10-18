@@ -1,19 +1,14 @@
 'use client'
 import React, { useState, useMemo } from 'react';
 import { CATEGORIES } from '@/lib/constants';
-import type { ChallengeSettings, KanjiWord } from '@/lib/constants';
 
-type CollectionWord = KanjiWord & {
-  kanji_level: string;
-  currentStatus?: string;
-  mistakeCount?: number;
-};
+type CollectionWord = any;
 
 type CollectionScreenProps = {
     currentUser: { id: string; light: string };
     setView: (view: string) => void;
     allWordsList: CollectionWord[];
-    challengeSettings: Pick<ChallengeSettings, 'unlocked_tips'> | null;
+    challengeSettings: any;
     speakWord: (text: string) => void;
     renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
     getFullReading: (reading: string, okurigana?: string | null) => string;
@@ -22,20 +17,21 @@ type CollectionScreenProps = {
     onSelfJudge?: (word: CollectionWord, remembered: boolean) => void;
     onRegisterMistake?: (input: { kanji: string; reading: string; note: string; category: string }) => Promise<boolean>;
     toggleArchiveStatus: (id: number, currentStatus: string) => void;
+    toggleHideTip: (tip: string, hide: boolean) => void;
 };
 
 export default function CollectionScreen(props: CollectionScreenProps) {
     const { 
         currentUser, setView, allWordsList, challengeSettings, 
         speakWord, renderReading, getFullReading, stopSpeaking, onViewCard,
-        onSelfJudge, onRegisterMistake, toggleArchiveStatus
+        onSelfJudge, onRegisterMistake, toggleArchiveStatus, toggleHideTip
     } = props;
     
     const [mainTab, setMainTab] = useState<'words'|'tips'|'archived'>('words');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [tipSearchQuery, setTipSearchQuery] = useState('');
-    const [tipsTab, setTipsTab] = useState<'all' | 'minecraft' | 'splatoon'>('all'); 
+    const [tipsTab, setTipsTab] = useState<'all' | 'minecraft' | 'splatoon' | 'trash'>('all'); 
 
     const [isMistakeFormOpen, setIsMistakeFormOpen] = useState(false);
     const [isSavingMistake, setIsSavingMistake] = useState(false);
@@ -50,6 +46,7 @@ export default function CollectionScreen(props: CollectionScreenProps) {
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
     const unlockedTips = challengeSettings?.unlocked_tips || [];
+    const hiddenTips = challengeSettings?.hidden_tips || [];
     
     const parseTip = (tip: string) => {
         if (tip.startsWith('[マイクラ] ')) return { type: 'minecraft', text: tip.replace('[マイクラ] ', '') };
@@ -66,8 +63,12 @@ export default function CollectionScreen(props: CollectionScreenProps) {
     };
 
     const filteredTips = unlockedTips
-        .map((tip, index) => ({ tip, index, parsed: parseTip(tip) }))
-        .filter((item) => {
+        .map((tip: string, index: number) => ({ tip, index, parsed: parseTip(tip) }))
+        .filter((item: any) => {
+            const isHidden = hiddenTips.includes(item.tip);
+            if (tipsTab === 'trash') return isHidden;
+            if (isHidden) return false;
+
             if (tipsTab === 'minecraft' && item.parsed.type !== 'minecraft') return false;
             if (tipsTab === 'splatoon' && item.parsed.type !== 'splatoon') return false;
             if (!item.parsed.text.toLocaleLowerCase().includes(tipSearchQuery.trim().toLocaleLowerCase())) return false;
@@ -112,9 +113,11 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             } 
             else if (mainTab === 'words') {
                 if (w.currentStatus === 'archived') return false; 
-                if (selectedCategory === 'mistakes' && !((w.mistakeCount || 0) > 0)) return false;
-                if (selectedCategory === 'hard' && !((w.mistakeCount || 0) >= 2)) return false;
-                if (selectedCategory !== 'mistakes' && selectedCategory !== 'hard' && w.kanji_level !== selectedCategory) return false;
+                if (selectedCategory) {
+                    if (selectedCategory === 'mistakes' && !((w.mistakeCount || 0) > 0)) return false;
+                    if (selectedCategory === 'hard' && !((w.mistakeCount || 0) >= 2)) return false;
+                    if (selectedCategory !== 'mistakes' && selectedCategory !== 'hard' && w.kanji_level !== selectedCategory) return false;
+                }
             }
 
             if (searchQuery && !w.kanji.includes(searchQuery) && !w.reading.includes(searchQuery)) return false;
@@ -149,7 +152,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
       }
     };
 
-    // ★ ポップアップの漢字表示用（4字熟語なら2文字で改行する）
     const formatPopupKanji = (text: string) => {
         if (text && text.length === 4 && !text.includes('\n')) {
             return <>{text.slice(0, 2)}<br />{text.slice(2)}</>;
@@ -164,12 +166,13 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             <div className="flex justify-between items-center mb-6">
               <button 
                 onClick={() => { 
-                    if (selectedCategory) { setSelectedCategory(null); } 
+                    if (searchQuery) { setSearchQuery(''); }
+                    else if (selectedCategory) { setSelectedCategory(null); } 
                     else { setView('menu'); stopSpeaking(); } 
                 }} 
                 className="text-stone-500 font-black bg-white px-5 py-2 rounded-full shadow-sm hover:bg-stone-50 transition active:scale-95"
               >
-                {selectedCategory ? '← もどる' : '🏠 むらへ'}
+                {searchQuery || selectedCategory ? '← もどる' : '🏠 むらへ'}
               </button>
               <h2 className="text-xl font-black text-stone-700 tracking-tighter">
                 {mainTab === 'words' ? '📖 言葉の図鑑' : mainTab === 'tips' ? '🎁 たからもの' : '📦 アーカイブ'}
@@ -178,29 +181,46 @@ export default function CollectionScreen(props: CollectionScreenProps) {
 
             <div className="flex p-1 bg-stone-200/50 rounded-2xl mb-6">
                 <button 
-                    onClick={() => { setMainTab('words'); setSelectedCategory(null); }} 
-                    className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'words' ? 'bg-white text-emerald-600 shadow-md' : 'text-stone-500'}`}
+                    onClick={() => { setMainTab('words'); setSelectedCategory(null); setSearchQuery(''); }} 
+                    className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'words' ? 'bg-white text-emerald-600 shadow-md' : 'text-stone-500 hover:bg-stone-100'}`}
                 >
                     漢字ずかん
                 </button>
                 <button 
-                    onClick={() => setMainTab('tips')} 
-                    className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'tips' ? 'bg-amber-700 text-amber-100 shadow-md' : 'text-stone-500'}`}
+                    onClick={() => { setMainTab('tips'); setSearchQuery(''); setTipsTab('all'); }} 
+                    className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'tips' ? 'bg-amber-700 text-amber-100 shadow-md' : 'text-stone-500 hover:bg-stone-100'}`}
                 >
-                    豆知識 ({unlockedTips.length})
+                    豆知識 ({unlockedTips.length - hiddenTips.length})
                 </button>
                 <button 
-                    onClick={() => { setMainTab('archived'); setSelectedCategory(null); }} 
-                    className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'archived' ? 'bg-stone-700 text-stone-100 shadow-md' : 'text-stone-500'}`}
+                    onClick={() => { setMainTab('archived'); setSelectedCategory(null); setSearchQuery(''); }} 
+                    className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'archived' ? 'bg-stone-700 text-stone-100 shadow-md' : 'text-stone-500 hover:bg-stone-100'}`}
                 >
                     📦 アーカイブ
                 </button>
             </div>
 
+            {(mainTab === 'words' || mainTab === 'archived') && (
+                <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border-2 border-stone-100 mb-6">
+                  <input 
+                    type="search" 
+                    placeholder={mainTab === 'archived' ? "アーカイブからさがす..." : selectedCategory ? "このカテゴリからさがす..." : "すべての漢字・よみでさがす..."} 
+                    className="w-full bg-stone-50 border-2 border-stone-100 rounded-2xl py-3 px-4 sm:px-5 mb-4 font-bold outline-none focus:border-emerald-400 text-stone-700" 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                  />
+                  <div className="grid grid-cols-3 gap-2 p-1 bg-stone-100 rounded-2xl">
+                    <button onClick={() => setFlashcardMode('normal')} className={`py-2 rounded-xl text-xs font-black ${flashcardMode === 'normal' ? 'bg-white shadow-sm text-emerald-600' : 'text-stone-500 hover:bg-stone-200'}`}>すべて</button>
+                    <button onClick={() => setFlashcardMode('hide_reading')} className={`py-2 rounded-xl text-xs font-black ${flashcardMode === 'hide_reading' ? 'bg-sky-500 text-white shadow-sm' : 'text-stone-500 hover:bg-stone-200'}`}>よみ隠す</button>
+                    <button onClick={() => setFlashcardMode('hide_kanji')} className={`py-2 rounded-xl text-xs font-black ${flashcardMode === 'hide_kanji' ? 'bg-orange-500 text-white shadow-sm' : 'text-stone-500 hover:bg-stone-200'}`}>漢字隠す</button>
+                  </div>
+                </div>
+            )}
+
             {mainTab === 'words' && (
-              <>
-                {!selectedCategory ? (
-                    <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4">
+              <div className="animate-in fade-in slide-in-from-bottom-4">
+                {!selectedCategory && !searchQuery ? (
+                    <div className="space-y-3">
                         {currentUser.id === 'brother' && (
                           <section className="rounded-3xl border-2 border-rose-200 bg-rose-50 p-4 shadow-sm">
                             <button
@@ -287,24 +307,9 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                         ))}
                     </div>
                 ) : (
-                    <div className="animate-in fade-in zoom-in-95 duration-300">
-                        <div className="bg-white rounded-3xl p-5 shadow-md border-2 border-stone-100 mb-6">
-                          <input 
-                            type="text" 
-                            placeholder="かんじ・よみでさがす..." 
-                            className="w-full bg-stone-50 border-2 border-stone-100 rounded-2xl py-3 px-5 mb-4 font-bold outline-none focus:border-emerald-400 text-stone-700" 
-                            value={searchQuery} 
-                            onChange={(e) => setSearchQuery(e.target.value)} 
-                          />
-                          <div className="grid grid-cols-3 gap-2 p-1 bg-stone-100 rounded-2xl">
-                            <button onClick={() => setFlashcardMode('normal')} className={`py-2 rounded-xl text-xs font-black ${flashcardMode === 'normal' ? 'bg-white shadow-sm text-emerald-600' : 'text-stone-500'}`}>すべて</button>
-                            <button onClick={() => setFlashcardMode('hide_reading')} className={`py-2 rounded-xl text-xs font-black ${flashcardMode === 'hide_reading' ? 'bg-sky-500 text-white shadow-sm' : 'text-stone-500'}`}>よみ隠す</button>
-                            <button onClick={() => setFlashcardMode('hide_kanji')} className={`py-2 rounded-xl text-xs font-black ${flashcardMode === 'hide_kanji' ? 'bg-orange-500 text-white shadow-sm' : 'text-stone-500'}`}>漢字隠す</button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-3">
-                          {filteredWords.map((w, index) => (
+                    <div className="grid grid-cols-3 gap-3">
+                      {filteredWords.length > 0 ? (
+                          filteredWords.map((w, index) => (
                             <div key={w.id} onClick={() => handleCardClick(w, index)} className="bg-white rounded-[2rem] p-3 border-b-4 border-stone-200 shadow-sm flex flex-col items-center justify-center relative aspect-square cursor-pointer active:scale-95 transition-transform overflow-hidden">
                               <div className="text-2xl mb-1">{w.emoji}</div>
                               <div className="relative w-full text-center px-1">
@@ -321,11 +326,16 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                               </div>
                               {w.currentStatus === 'gold' && <div className="absolute top-2 right-2 text-xs">👑</div>}
                             </div>
-                          ))}
-                        </div>
+                          ))
+                      ) : (
+                          <div className="col-span-3 py-10 text-center">
+                              <p className="text-4xl mb-3">🐶</p>
+                              <p className="text-stone-400 font-black">該当する漢字が見つかりませんでした。</p>
+                          </div>
+                      )}
                     </div>
                 )}
-              </>
+              </div>
             )}
 
             {mainTab === 'tips' && (
@@ -340,16 +350,17 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                     className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-bold text-stone-700 outline-none focus:border-sky-400 mb-2"
                   />
                   <div className="flex gap-2">
-                    <button onClick={() => setTipsTab('all')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'all' ? 'bg-stone-700 text-white shadow-sm' : 'bg-stone-100 text-stone-400 hover:bg-stone-200'}`}>すべて</button>
-                    <button onClick={() => setTipsTab('minecraft')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'minecraft' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>マイクラ</button>
-                    <button onClick={() => setTipsTab('splatoon')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'splatoon' ? 'bg-yellow-400 text-yellow-900 shadow-sm' : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'}`}>スプラ</button>
+                    <button onClick={() => setTipsTab('all')} className={`flex-1 py-2 text-[11px] sm:text-xs font-black rounded-xl transition-all ${tipsTab === 'all' ? 'bg-stone-700 text-white shadow-sm' : 'bg-stone-100 text-stone-400 hover:bg-stone-200'}`}>すべて</button>
+                    <button onClick={() => setTipsTab('minecraft')} className={`flex-1 py-2 text-[11px] sm:text-xs font-black rounded-xl transition-all ${tipsTab === 'minecraft' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>マイクラ</button>
+                    <button onClick={() => setTipsTab('splatoon')} className={`flex-1 py-2 text-[11px] sm:text-xs font-black rounded-xl transition-all ${tipsTab === 'splatoon' ? 'bg-yellow-400 text-yellow-900 shadow-sm' : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'}`}>スプラ</button>
+                    <button onClick={() => setTipsTab('trash')} className={`flex-1 py-2 text-[11px] sm:text-xs font-black rounded-xl transition-all ${tipsTab === 'trash' ? 'bg-stone-800 text-white shadow-sm' : 'bg-stone-200 text-stone-500 hover:bg-stone-300'}`}>🗑️ ゴミ箱</button>
                   </div>
                 </div>
                 
                 {filteredTips.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3">
                     {filteredTips.map(({ tip, index, parsed }) => (
-                      <article key={`${index}-${tip}`} className="rounded-2xl border-2 border-stone-100 bg-white p-4 shadow-sm relative overflow-hidden">
+                      <article key={`${index}-${tip}`} className="group rounded-2xl border-2 border-stone-100 bg-white p-4 shadow-sm relative overflow-hidden">
                         {parsed.type === 'minecraft' && <span className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-sm">マイクラ</span>}
                         {parsed.type === 'splatoon' && <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-sm">スプラ</span>}
                         
@@ -357,9 +368,21 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                           <span className="shrink-0 text-2xl" aria-hidden="true">📜</span>
                           <p className="min-w-0 flex-1 break-words text-base font-bold leading-relaxed text-stone-700">{parsed.text}</p>
                         </div>
-                        <p className="mt-3 text-right text-[10px] font-black text-stone-300">豆知識 #{index + 1}</p>
+                        <div className="mt-3 flex justify-between items-center">
+                          <p className="text-[10px] font-black text-stone-300">豆知識 #{index + 1}</p>
+                          {tipsTab === 'trash' ? (
+                              <button onClick={() => toggleHideTip(tip, false)} className="text-[10px] bg-emerald-100 text-emerald-600 px-3 py-1 rounded-lg font-black hover:bg-emerald-200 active:scale-95 transition-all">✨ 元に戻す</button>
+                          ) : (
+                              <button onClick={() => toggleHideTip(tip, true)} className="text-[10px] bg-stone-100 text-stone-400 px-3 py-1 rounded-lg font-black hover:bg-rose-100 hover:text-rose-500 active:scale-95 transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100">🗑️ 非表示</button>
+                          )}
+                        </div>
                       </article>
                     ))}
+                  </div>
+                ) : tipsTab === 'trash' ? (
+                  <div className="py-10 text-center">
+                    <p className="text-4xl mb-3 grayscale opacity-50">🗑️</p>
+                    <p className="font-bold text-stone-400">ごみ箱は空です</p>
                   </div>
                 ) : unlockedTips.length > 0 ? (
                   <div className="py-10 text-center">
@@ -401,7 +424,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             )}
           </div>
 
-          {/* ★ ポップアップのレイアウト調整部分 */}
           {selectedIndex !== null && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-md animate-in fade-in" onClick={() => setSelectedIndex(null)}>
               <div className="bg-white w-[95vw] sm:w-[min(88vw,42rem)] max-w-2xl h-[88dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col overflow-y-auto rounded-[2.5rem] sm:rounded-[3rem] p-4 sm:p-8 relative shadow-2xl animate-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
@@ -421,7 +443,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                   <div className="min-w-0 flex-1 text-center px-1 sm:px-4 flex flex-col items-center justify-center h-full animate-in zoom-in duration-300" key={selectedIndex}>
                     <div className="text-4xl sm:text-6xl mb-3 sm:mb-4 shrink-0">{filteredWords[selectedIndex].emoji}</div>
                     
-                    {/* ★ 四字熟語バランス対応 */}
                     <h2 className="text-[3.5rem] sm:text-[6rem] md:text-[8rem] font-black text-stone-800 leading-tight mb-5 sm:mb-6 drop-shadow-md break-words shrink-0">
                       {flashcardMode === 'hide_kanji' && !isAnswerRevealed ? '？' : formatPopupKanji(filteredWords[selectedIndex].kanji)}
                     </h2>
