@@ -20,37 +20,67 @@ type CollectionScreenProps = {
     stopSpeaking: () => void;
     onViewCard?: () => void;
     onSelfJudge?: (word: CollectionWord, remembered: boolean) => void;
-    onRegisterMistake?: (input: { kanji: string; reading: string; note: string }) => Promise<boolean>;
-    toggleArchiveStatus: (id: number, currentStatus: string) => void; // ★ 追加
+    onRegisterMistake?: (input: { kanji: string; reading: string; note: string; category: string }) => Promise<boolean>;
+    toggleArchiveStatus: (id: number, currentStatus: string) => void;
 };
 
 export default function CollectionScreen(props: CollectionScreenProps) {
     const { 
         currentUser, setView, allWordsList, challengeSettings, 
         speakWord, renderReading, getFullReading, stopSpeaking, onViewCard,
-        onSelfJudge, onRegisterMistake, toggleArchiveStatus // ★ 追加
+        onSelfJudge, onRegisterMistake, toggleArchiveStatus
     } = props;
     
-    // ★ 'archived' タブを追加
     const [mainTab, setMainTab] = useState<'words'|'tips'|'archived'>('words');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [tipSearchQuery, setTipSearchQuery] = useState('');
+    const [tipsTab, setTipsTab] = useState<'all' | 'minecraft' | 'splatoon'>('all'); 
+
     const [isMistakeFormOpen, setIsMistakeFormOpen] = useState(false);
     const [isSavingMistake, setIsSavingMistake] = useState(false);
-    const [mistakeForm, setMistakeForm] = useState({ kanji: '', reading: '', note: '' });
+    
+    const defaultCategory = CATEGORIES.find(c => c.id.includes('exam'))?.id || CATEGORIES[0]?.id || 'kyu6';
+    const [mistakeForm, setMistakeForm] = useState({ kanji: '', reading: '', note: '', category: defaultCategory });
+    
     const [flashcardMode, setFlashcardMode] = useState<'normal'|'hide_kanji'|'hide_reading'>('normal');
     
-    // グリッドでのクイズ表示用に保持
     const [revealedCards, setRevealedCards] = useState<number[]>([]);
     const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
-    // フラッシュカードの現在地インデックス
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
     const unlockedTips = challengeSettings?.unlocked_tips || [];
+    
+    const parseTip = (tip: string) => {
+        if (tip.startsWith('[マイクラ] ')) return { type: 'minecraft', text: tip.replace('[マイクラ] ', '') };
+        if (tip.startsWith('[スプラ] ')) return { type: 'splatoon', text: tip.replace('[スプラ] ', '') };
+        
+        // ★ 過去データ（プレフィックスなし）の自動判定
+        if (tip.includes('/') || tip.includes('@') || tip.includes('コマンド') || tip.includes('ブロック') || tip.includes('エンティティ')) {
+            return { type: 'minecraft', text: tip };
+        }
+        if (tip.includes('ブキ') || tip.includes('インク') || tip.includes('ギア') || tip.includes('スペシャル') || tip.includes('イカ')) {
+            return { type: 'splatoon', text: tip };
+        }
+        
+        return { type: 'other', text: tip }; 
+    };
+
     const filteredTips = unlockedTips
-      .map((tip, index) => ({ tip, index }))
-      .filter(({ tip }) => tip.toLocaleLowerCase().includes(tipSearchQuery.trim().toLocaleLowerCase()));
+        .map((tip, index) => ({ tip, index, parsed: parseTip(tip) }))
+        .filter((item) => {
+            // ★ 厳密なフィルタリング
+            if (tipsTab === 'minecraft' && item.parsed.type !== 'minecraft') return false;
+            if (tipsTab === 'splatoon' && item.parsed.type !== 'splatoon') return false;
+            if (!item.parsed.text.toLocaleLowerCase().includes(tipSearchQuery.trim().toLocaleLowerCase())) return false;
+            return true;
+        })
+        .sort((a: any, b: any) => {
+           // ★ ジャンルでソート（マイクラ -> スプラ -> その他）
+           if (a.parsed.type < b.parsed.type) return -1;
+           if (a.parsed.type > b.parsed.type) return 1;
+           return a.index - b.index;
+        });
 
     const categoryStats = useMemo(() => {
         const standardCategories = CATEGORIES.map(cat => {
@@ -80,11 +110,9 @@ export default function CollectionScreen(props: CollectionScreenProps) {
 
     const filteredWords = useMemo(() => {
         return allWordsList.filter(w => {
-            // ★ アーカイブタブの処理
             if (mainTab === 'archived') {
                 if (w.currentStatus !== 'archived') return false;
             } 
-            // ★ 通常のずかんタブからはアーカイブを除外
             else if (mainTab === 'words') {
                 if (w.currentStatus === 'archived') return false; 
                 if (selectedCategory === 'mistakes' && !((w.mistakeCount || 0) > 0)) return false;
@@ -95,9 +123,8 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             if (searchQuery && !w.kanji.includes(searchQuery) && !w.reading.includes(searchQuery)) return false;
             return true;
         });
-    }, [allWordsList, selectedCategory, searchQuery, mainTab]); // ★ mainTab を依存配列に追加
+    }, [allWordsList, selectedCategory, searchQuery, mainTab]);
 
-    // グリッドのタップ時の挙動（クイズ表示を解除 ＆ フラッシュカードを開く）
     const handleCardClick = (w: CollectionWord, index: number) => {
       const wasRevealed = revealedCards.includes(w.id);
       if (!wasRevealed) {
@@ -115,7 +142,7 @@ export default function CollectionScreen(props: CollectionScreenProps) {
       try {
         const registered = await onRegisterMistake(mistakeForm);
         if (registered) {
-          setMistakeForm({ kanji: '', reading: '', note: '' });
+          setMistakeForm({ kanji: '', reading: '', note: '', category: defaultCategory });
           setIsMistakeFormOpen(false);
           setSelectedCategory('mistakes');
           setMainTab('words');
@@ -157,7 +184,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                 >
                     豆知識 ({unlockedTips.length})
                 </button>
-                {/* ★ アーカイブタブの追加 */}
                 <button 
                     onClick={() => { setMainTab('archived'); setSelectedCategory(null); }} 
                     className={`flex-1 py-3 rounded-xl font-black text-sm transition-all ${mainTab === 'archived' ? 'bg-stone-700 text-stone-100 shadow-md' : 'text-stone-500'}`}
@@ -186,6 +212,15 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                             </button>
                             {isMistakeFormOpen && (
                               <form onSubmit={handleMistakeSubmit} className="mt-4 space-y-3 border-t border-rose-200 pt-4">
+                                <select
+                                  value={mistakeForm.category}
+                                  onChange={event => setMistakeForm(form => ({ ...form, category: event.target.value }))}
+                                  className="w-full rounded-xl border border-rose-200 bg-white px-4 py-3 font-bold text-stone-700 outline-none focus:border-rose-400"
+                                >
+                                  {CATEGORIES.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                  ))}
+                                </select>
                                 <input
                                   required
                                   maxLength={20}
@@ -289,45 +324,52 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             )}
 
             {mainTab === 'tips' && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-                <div className="rounded-2xl border border-amber-200 bg-white p-3 shadow-sm">
+              <div className="animate-in fade-in slide-in-from-bottom-4">
+                <div className="rounded-2xl border-2 border-stone-200 bg-white p-3 shadow-sm mb-4">
                   <input
                     type="search"
                     value={tipSearchQuery}
                     onChange={(event) => setTipSearchQuery(event.target.value)}
                     placeholder="豆知識をキーワードで検索..."
                     aria-label="豆知識を検索"
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-bold text-stone-700 outline-none focus:border-amber-400"
+                    className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-bold text-stone-700 outline-none focus:border-sky-400 mb-2"
                   />
-                  <p className="px-1 pt-2 text-xs font-bold text-stone-500">{filteredTips.length} / {unlockedTips.length} 件</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setTipsTab('all')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'all' ? 'bg-stone-700 text-white shadow-sm' : 'bg-stone-100 text-stone-400 hover:bg-stone-200'}`}>すべて</button>
+                    <button onClick={() => setTipsTab('minecraft')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'minecraft' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'}`}>マイクラ</button>
+                    <button onClick={() => setTipsTab('splatoon')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'splatoon' ? 'bg-yellow-400 text-yellow-900 shadow-sm' : 'bg-yellow-50 text-yellow-600 hover:bg-yellow-100'}`}>スプラ</button>
+                  </div>
                 </div>
+                
                 {filteredTips.length > 0 ? (
                   <div className="grid grid-cols-1 gap-3">
-                    {filteredTips.map(({ tip, index }) => (
-                      <article key={`${index}-${tip}`} className="rounded-2xl border border-amber-200 bg-[#fdf6e3] p-4 shadow-sm sm:p-5">
-                        <div className="flex items-start gap-3">
+                    {filteredTips.map(({ tip, index, parsed }) => (
+                      <article key={`${index}-${tip}`} className="rounded-2xl border-2 border-stone-100 bg-white p-4 shadow-sm relative overflow-hidden">
+                        {parsed.type === 'minecraft' && <span className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-sm">マイクラ</span>}
+                        {parsed.type === 'splatoon' && <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-sm">スプラ</span>}
+                        
+                        <div className="flex items-start gap-3 mt-1">
                           <span className="shrink-0 text-2xl" aria-hidden="true">📜</span>
-                          <p className="min-w-0 flex-1 break-words text-base font-bold leading-relaxed text-amber-950">{tip}</p>
+                          <p className="min-w-0 flex-1 break-words text-base font-bold leading-relaxed text-stone-700">{parsed.text}</p>
                         </div>
-                        <p className="mt-3 text-right text-[10px] font-black text-amber-800/50">豆知識 #{index + 1}</p>
+                        <p className="mt-3 text-right text-[10px] font-black text-stone-300">豆知識 #{index + 1}</p>
                       </article>
                     ))}
                   </div>
                 ) : unlockedTips.length > 0 ? (
-                  <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-                    <p className="text-3xl mb-2">🔎</p>
-                    <p className="font-bold text-stone-500">一致する豆知識がありません</p>
+                  <div className="py-10 text-center">
+                    <p className="text-3xl mb-3">🔎</p>
+                    <p className="font-bold text-stone-400">一致する豆知識がありません</p>
                   </div>
                 ) : (
-                        <div className="bg-white/50 border-4 border-dashed border-stone-200 rounded-[3rem] p-16 text-center">
-                            <p className="text-6xl mb-6 grayscale opacity-30">📦</p>
-                            <p className="text-stone-400 font-black">まだお宝がありません。<br/>冒険（10分学習）をして<br/>宝箱をみつけよう！</p>
-                        </div>
-                    )}
-                </div>
+                  <div className="bg-white/50 border-4 border-dashed border-stone-200 rounded-[3rem] p-16 text-center">
+                      <p className="text-6xl mb-6 grayscale opacity-30">📦</p>
+                      <p className="text-stone-400 font-black">まだお宝がありません。<br/>冒険（10分学習）をして<br/>宝箱をみつけよう！</p>
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* ★ アーカイブ一覧の表示 */}
             {mainTab === 'archived' && (
                 <div className="animate-in fade-in slide-in-from-bottom-4">
                     {filteredWords.length > 0 ? (
@@ -354,9 +396,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             )}
           </div>
 
-          {/* ==========================================
-              ★ タスク 3: 巨大フラッシュカード化
-             ========================================== */}
           {selectedIndex !== null && (
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center overflow-y-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 bg-stone-900/80 backdrop-blur-md animate-in fade-in" onClick={() => setSelectedIndex(null)}>
               <div className="bg-white w-[min(88vw,42rem)] max-w-2xl max-h-[72dvh] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[2rem] sm:rounded-[3rem] p-4 pt-14 sm:p-8 sm:pt-16 relative flex flex-col items-center justify-start shadow-2xl animate-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
@@ -364,7 +403,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                 <button onClick={() => setSelectedIndex(null)} className="absolute top-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-stone-100 text-stone-500 hover:text-stone-700 text-2xl font-black" aria-label="閉じる">✖</button>
                 
                 <div className="flex items-center justify-between w-full mt-4">
-                  {/* ◀ 前へ */}
                   <button 
                     onClick={() => {
                       setSelectedIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
@@ -374,7 +412,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                     className={`shrink-0 text-3xl sm:text-6xl transition-all p-1 sm:p-4 ${selectedIndex === 0 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
                   >◀</button>
 
-                  {/* 巨大な漢字と読み表示 */}
                     <div className="min-w-0 flex-1 text-center px-1 sm:px-4 flex flex-col items-center animate-in zoom-in duration-300" key={selectedIndex}>
                     <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">{filteredWords[selectedIndex].emoji}</div>
                     <h2 className="text-6xl sm:text-[8rem] md:text-[10rem] font-black text-stone-800 leading-none mb-4 sm:mb-6 drop-shadow-md">
@@ -404,7 +441,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                        </div>
                     )}
 
-                    {/* ★ アーカイブの切り替えボタン */}
                     <button 
                       onClick={() => {
                         toggleArchiveStatus(filteredWords[selectedIndex].id, filteredWords[selectedIndex].currentStatus || 'learning');
@@ -441,7 +477,6 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                     </div>
                   </div>
 
-                  {/* 次へ ▶ */}
                   <button 
                     onClick={() => {
                       setSelectedIndex(prev => (prev !== null && prev < filteredWords.length - 1 ? prev + 1 : prev));

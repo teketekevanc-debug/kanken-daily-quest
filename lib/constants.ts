@@ -88,13 +88,14 @@ export const USERS = [
 
 // 受験対策・分野別の教材カテゴリ
 export const CATEGORIES = [
-  { id: 'kyu4', name: '4級(中学受験・頻出)' },
-  { id: 'exam_kyu5', name: '5級(中学受験・頻出)' },
-  { id: 'exam_kyu6', name: '6級(中学受験・頻出)' },
+  { id: 'exam_frequent', name: '中学受験 頻出漢字' }, // ★メインを一番上に配置
   { id: 'idiom', name: '四字熟語・慣用句' },
   { id: 'synonym_antonym', name: '対義語・類義語' },
   { id: 'grammar', name: '言葉の知識・文法' },
   { id: 'loanword_emotion', name: '外来語・心情語' },
+  { id: 'exam_kyu6', name: '6級(中学受験・頻出)' },
+  { id: 'exam_kyu5', name: '5級(中学受験・頻出)' },
+  { id: 'kyu4', name: '4級(中学受験・頻出)' },
   { id: 'mission_100', name: '合格への100日特訓' },
   { id: 'kyu6', name: '小学5年相当' },
   { id: 'kyu5', name: '小学6年相当' },
@@ -102,7 +103,7 @@ export const CATEGORIES = [
   { id: 'kyu9', name: '9級 (小2)' },
   { id: 'kyu8', name: '8級 (小3)' },
   { id: 'kyu7', name: '7級 (小4)' },
-  { id: 'general', name: '一般・中学以上' }
+  { id: 'general', name: '一般・中学以上' },
 ];
 
 export type ExamMissionPhase = {
@@ -117,14 +118,14 @@ export type ExamMissionPhase = {
   isActive: boolean;
 };
 
-// 特訓計画: 基礎30日、文章活用30日、本番まで仕上げる。試験日は2027-02-01。
+// ★特訓計画: 頻出漢字30日、語彙強化30日、本番まで仕上げる。試験日は2027-02-01。
 export const getExamMissionPhase = (date = new Date()): ExamMissionPhase => {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit'
   }).formatToParts(date);
   const getPart = (type: string) => Number(parts.find(part => part.type === type)?.value);
   const todayUtc = Date.UTC(getPart('year'), getPart('month') - 1, getPart('day'));
-  const startUtc = Date.UTC(2026, 9, 1);
+  const startUtc = Date.UTC(2026, 9, 1); // 10月1日スタート
   const examUtc = Date.UTC(2027, 1, 1);
   const dayMs = 24 * 60 * 60 * 1000;
   const daysUntilExam = Math.max(0, Math.ceil((examUtc - todayUtc) / dayMs));
@@ -135,37 +136,41 @@ export const getExamMissionPhase = (date = new Date()): ExamMissionPhase => {
     return {
       phase: 0, dayNumber: 0, daysUntilStart, daysUntilExam,
       title: '準備期間', focus: '教材をそろえ、1日10分カードを習慣にする',
-      period: '10月1日スタート', categoryIds: [], isActive: false
+      period: '10月1日スタート', categoryIds: ['exam_frequent'], isActive: false
     };
   }
   if (todayUtc >= examUtc) {
     return {
       phase: 4, dayNumber: 100, daysUntilStart: 0, daysUntilExam,
       title: '本番日', focus: '多摩大目黒（特待）・桐光学園 入試本番',
-      period: '2月1日', categoryIds: [], isActive: false
+      period: '2月1日', categoryIds: ['exam_frequent', 'idiom', 'synonym_antonym'], isActive: false
     };
   }
   if (dayNumber <= 30) {
     return {
       phase: 1, dayNumber, daysUntilStart: 0, daysUntilExam,
-      title: '基礎を固める', focus: '漢字・語句の意味を正確に覚える',
+      title: '頻出漢字マスター期', focus: '「中学受験 頻出漢字」を徹底的にインプット！正確に書けるようにしよう。',
       period: '10月1日〜10月30日',
-      categoryIds: ['kyu6', 'exam_kyu6', 'kyu5', 'idiom', 'synonym_antonym'], isActive: true
+      categoryIds: ['exam_frequent'], // ★ 頻出漢字のみを集中特訓
+      isActive: true
     };
   }
   if (dayNumber <= 60) {
     return {
       phase: 2, dayNumber, daysUntilStart: 0, daysUntilExam,
-      title: '文章の中で使う', focus: '文脈・文法・語句の使い分けを練習する',
+      title: '語彙力強化期', focus: '頻出漢字に加えて、四字熟語や慣用句・類義語など入試で差がつく語彙を練習する',
       period: '10月31日〜11月29日',
-      categoryIds: ['kyu5', 'kyu4', 'exam_kyu5', 'idiom', 'synonym_antonym', 'grammar', 'loanword_emotion'], isActive: true
+      categoryIds: ['exam_frequent', 'idiom', 'synonym_antonym'], // ★ 頻出漢字 ＋ 語彙（四字熟語・類義語など）
+      isActive: true
     };
   }
   return {
     phase: 3, dayNumber: Math.min(dayNumber, 100), daysUntilStart: 0, daysUntilExam,
-    title: '得点力を仕上げる', focus: '頻出問題・苦手分野を時間内に解き、正答を安定させる',
+    title: '入試本番仕上げ期', focus: '本番形式のミックス出題！頻出問題・苦手分野を時間内に解き、正答を安定させる',
     period: '11月30日〜1月31日',
-    categoryIds: ['mission_100', 'kyu4', 'exam_kyu5', 'idiom', 'synonym_antonym', 'grammar', 'loanword_emotion', 'exam_kyu6'], isActive: true
+    // ★ 語彙全般のミックス。古い学年別（kyu6など）は外しています。
+    categoryIds: ['exam_frequent', 'idiom', 'synonym_antonym', 'grammar', 'loanword_emotion'], 
+    isActive: true
   };
 };
 
@@ -176,7 +181,8 @@ export const MODE_NAMES: Record<string, string> = {
   parent_challenge: 'パパからの挑戦',
   rick_challenge: 'Rickの特訓',
   revenge: 'リベンジ',
-  mission_100: '合格への100日特訓'
+  mission_100: '合格への100日特訓',
+  exam: '受験モード (弱点特訓)' // ★ 追加
 };
 
 // --- ヘルパー関数 ---

@@ -33,11 +33,13 @@ export default function Home() {
 
   // --- 基本ステート ---
   const [currentUser, setCurrentUser] = useState(defaultUser)
-  const [view, setView] = useState<'menu'|'game'|'rick_challenge'|'result'|'admin'|'collection'>('menu')
+  const [view, setView] = useState<'menu'|'game'|'rick_challenge'|'result'|'result_chest'|'admin'|'collection'>('menu')
   const [mode, setMode] = useState<'daily'|'free'|'weekend'|'parent_challenge'|'rick_challenge'|'revenge'|'mission_100'|'exam'>('daily')
   const [loading, setLoading] = useState(false);
   const [targetKyu, setTargetKyu] = useState('kyu6')
+  
   const [selectedInputMode, setSelectedInputMode] = useState<'quiz_kanji'|'typing_read'|'write_canvas'|'write_self'>('write_canvas')
+  
   const [rickMode, setRickMode] = useState<'read'|'think'|'write'>('read')
   const [adminTargetUser, setAdminTargetUser] = useState(defaultUser)
   const [allWordsList, setAllWordsList] = useState<any[]>([]);
@@ -254,14 +256,22 @@ export default function Home() {
     fetchAdminStats(adminTargetUser);
   }, [adminTargetUser, editStreak, fetchAdminStats]);
 
-  const handleAddWord = useCallback(async (newWordData: any) => {
-    const { error } = await supabase.from('kanji_questions').insert([{ ...newWordData, kanji_level: newWordData.category, target_user: adminTargetUser.db_target }]);
-    if (error) alert("追加に失敗しました: " + error.message);
-    else {
-      alert('単語を追加しました！');
-      fetchAllWordsForEdit();
+  const handleAddWord = useCallback(async (newWordData: any, isMistake: boolean) => {
+    const { data: insertedWord, error } = await supabase
+      .from('kanji_questions')
+      .insert([{ ...newWordData, kanji_level: newWordData.category, target_user: adminTargetUser.db_target }])
+      .select('id').single();
+
+    if (error) { alert("追加に失敗しました: " + error.message); return; }
+
+    if (isMistake && insertedWord) {
+      await supabase.from('user_progress').upsert({
+        user_id: adminTargetUser.id, question_id: insertedWord.id, status: 'learning', mistake_count: 1, last_reviewed_at: new Date().toISOString()
+      }, { onConflict: 'user_id, question_id' });
     }
-  }, [adminTargetUser.db_target, fetchAllWordsForEdit]);
+    alert('単語を追加しました！');
+    fetchAllWordsForEdit();
+  }, [adminTargetUser, fetchAllWordsForEdit]);
 
   const handleUpdateWord = useCallback(async (id: number, updatedData: any) => {
     const { error } = await supabase.from('kanji_questions').update(updatedData).eq('id', id);
@@ -303,7 +313,7 @@ export default function Home() {
     if (error) alert('判定を保存できませんでした: ' + error.message);
   }, [currentUser.id]);
 
-  const registerCollectionMistake = useCallback(async ({ kanji, reading, note }: { kanji: string; reading: string; note: string }) => {
+  const registerCollectionMistake = useCallback(async ({ kanji, reading, note, category }: { kanji: string; reading: string; note: string; category: string }) => {
     const normalizedKanji = kanji.trim();
     const normalizedReading = reading.trim();
     if (!normalizedKanji || !normalizedReading) return false;
@@ -333,8 +343,8 @@ export default function Home() {
           okurigana: '',
           sentence: '',
           emoji: '📝',
-          category: 'mistakes',
-          kanji_level: 'mistakes',
+          category: category,
+          kanji_level: category,
           usage_example: note.trim() || null,
           origin_logic: null
         })
@@ -438,13 +448,32 @@ export default function Home() {
     setOptions([word, ...others].sort(() => 0.5 - Math.random()));
   }, [selectedInputMode]);
 
+  const openChestRoom = async () => {
+    setLoading(true);
+    const { data: splaTips } = await supabase.from('splatoon_tips').select('content');
+    const { data: mcTips } = await supabase.from('minecraft_tips').select('content');
+    
+    const splaList = splaTips?.map(t => `[スプラ] ${t.content}`) || [];
+    const mcList = mcTips?.map(t => `[マイクラ] ${t.content}`) || [];
+    const allTips = [...splaList, ...mcList];
+    
+    const unlocked = challengeSettings?.unlocked_tips || [];
+    const unobtained = allTips.filter(t => !unlocked.includes(t));
+    const pool = unobtained.length >= 2 ? unobtained : allTips;
+    const shuffled = pool.sort(() => 0.5 - Math.random());
+    
+    setRewardTipsList(shuffled.slice(0, 2));
+    setOpenedChests([]);
+    setView('result_chest');
+    setLoading(false);
+  };
+
   const startGame = async (selectedMode: any) => {
     setLoading(true);
     setMode(selectedMode);
     setOpenedChests([]);
     setMistakeCount(0);
 
-    // ★ 合格ミッションと受験モードは手書きモードを強制
     if (selectedMode === 'mission_100' || selectedMode === 'exam') {
         setSelectedInputMode('write_canvas');
     }
@@ -463,7 +492,6 @@ export default function Home() {
 
     let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
     
-    // ★ mistakes と hard は kanji_level の絞り込みから外す
     if (selectedMode !== 'mission_100' && selectedMode !== 'exam' && targetKyu !== 'all' && targetKyu !== 'mistakes' && targetKyu !== 'hard') {
       query = query.eq('kanji_level', targetKyu);
     }
@@ -529,7 +557,6 @@ export default function Home() {
     } else {
       let activeWords = allW.filter(w => statusMap.get(w.id) !== 'archived');
 
-      // ★ targetKyu が mistakes または hard の場合の追加フィルタリング
       if (targetKyu === 'mistakes') {
           activeWords = activeWords.filter(w => (mistakeMap.get(w.id) || 0) > 0 || w.kanji_level === 'mistakes');
       } else if (targetKyu === 'hard') {
@@ -719,20 +746,6 @@ export default function Home() {
             }
         }
 
-        const tSec = dailyProgress.study_time_seconds || 0;
-        const isWritingMode = ['write_canvas', 'write_self'].includes(selectedInputMode);
-        const threshold = isWritingMode ? 300 : 600; 
-        
-        let cCount = tSec >= threshold ? (1 + Math.floor((tSec - threshold) / 300)) : 0;
-        if (isWritingMode) {
-            cCount *= 2;
-        }
-        
-        const { data: tips } = await supabase.from(currentUser.defaultTipTable).select('content');
-        const allTips = tips?.map(t => t.content) || [];
-        const shuffledTips = allTips.slice().sort(() => 0.5 - Math.random());
-        
-        setRewardTipsList(shuffledTips.slice(0, Math.min(10, cCount)));
         setView('result');
 
     } else {
@@ -918,7 +931,7 @@ export default function Home() {
     </>
   );
 
-  if (view === 'menu') return withGlobalTimer(<MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission: getExamMissionPhase()}} />);
+  if (view === 'menu') return withGlobalTimer(<MenuScreen {...{currentUser, setCurrentUser, dailyProgress, challengeSettings, targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode, rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal, hasParentChallenge, startGame, setView: navTo, fetchCollection: () => { setView('collection'); fetchAllWordsForEdit(currentUser); }, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission: getExamMissionPhase(), openChestRoom}} />);
 
   if (view === 'admin') return withGlobalTimer(<AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings, saveChallengeSettings, sendLineToChild, editStreak, setEditStreak, handleSaveStreak, handleAddWord, handleUpdateWord, allWordsList, toggleMasterStatus, handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />);
 
@@ -944,59 +957,85 @@ export default function Home() {
   );
 
   if (view === 'result') {
-    const isRRoom = rewardTipsList.length > 0;
     const tS = dailyProgress.study_time_seconds || 0;
-    const isWritingMode = ['write_canvas', 'write_self'].includes(selectedInputMode);
-    const threshold = isWritingMode ? 300 : 600;
-    const progP = Math.min(100, (tS / threshold) * 100);
-    const remainingMin = Math.ceil(Math.max(0, threshold - tS) / 60);
+    const is10MinDone = tS >= 600;
+    const isMission100Done = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['mission_100'] && d.result === 'done');
 
     return withGlobalTimer(
-        <div className={`min-h-screen ${isRRoom ? 'bg-slate-950' : currentUser.light} flex flex-col items-center justify-center p-6 text-center font-sans transition-colors duration-1000`}>
-            {isRRoom ? (
-                <div className="w-full max-w-lg animate-in fade-in zoom-in duration-700">
-                    <div className="mb-8 text-left">
-                        <h2 className="text-4xl font-black text-yellow-400 mb-2">✨ 秘密の宝物庫 ✨</h2>
-                        <p className="text-sky-300 font-bold text-sm tracking-widest">宝箱をタップして豆知識を手にいれよう！</p>
+        <div className={`min-h-screen ${currentUser.light} flex flex-col items-center justify-center p-6 text-center font-sans transition-colors duration-1000`}>
+            <div className="bg-white rounded-[3.5rem] shadow-2xl p-10 w-full max-w-sm border-4 border-stone-100">
+                <h2 className="text-4xl font-black text-emerald-500 mb-6">QUEST CLEAR!</h2>
+                <div className="relative w-32 h-32 mx-auto mb-8">
+                    <img src="/Rick.png" alt="Rick" className="w-full h-full rounded-full shadow-lg border-4 border-white object-cover" />
+                </div>
+                <div className="bg-stone-50 p-6 rounded-3xl mb-8 text-left border-2 border-stone-100 space-y-3">
+                    <p className="text-sm font-black text-stone-700 mb-2">🎁 今日の宝箱への道のり</p>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xl">{is10MinDone ? '✅' : '🔲'}</span>
+                        <span className={`text-xs font-bold ${is10MinDone ? 'text-emerald-600' : 'text-stone-500'}`}>1日10分のカード学習</span>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-5 mb-10">
-                        {rewardTipsList.map((tip, idx) => {
-                            const isOpened = openedChests.includes(idx);
-                            return (
-                                <div key={idx} onClick={async () => {
-                                    if(!isOpened) {
-                                        playSound('chest'); setOpenedChests([...openedChests, idx]); confetti({ particleCount: 30 });
-                                        const currentTips = challengeSettings?.unlocked_tips || [];
-                                        if (!currentTips.includes(tip)) {
-                                            const nextTips = [...currentTips, tip];
-                                            setChallengeSettings((p:any) => ({...p, unlocked_tips: nextTips}));
-                                            await supabase.from('challenge_settings').update({ unlocked_tips: nextTips }).eq('target_user_id', currentUser.id);
-                                        }
-                                    }
-                                }} className={`relative p-5 rounded-[2.5rem] border-2 transition-all duration-500 cursor-pointer transform active:scale-90 ${isOpened ? 'bg-slate-900/50 border-slate-800 scale-95 shadow-inner' : 'bg-gradient-to-b from-slate-800 to-slate-900 border-yellow-500/50 shadow-lg'}`}>
-                                    {!isOpened && <div className="absolute inset-0 bg-yellow-400/5 rounded-[2.5rem] animate-pulse"></div>}
-                                    <div className={`text-6xl mb-3 ${isOpened ? 'rotate-12 scale-110' : ''}`}>{isOpened ? '🎁' : '📦'}</div>
-                                    <p className={`text-[11px] font-black transition-colors ${isOpened ? 'text-sky-200' : 'text-yellow-600'}`}>{isOpened ? tip : '開ける！'}</p>
-                                </div>
-                            );
-                        })}
+                    <div className="flex items-center gap-2">
+                        <span className="text-xl">{isMission100Done ? '✅' : '🔲'}</span>
+                        <span className={`text-xs font-bold ${isMission100Done ? 'text-emerald-600' : 'text-stone-500'}`}>合格ミッションのクリア</span>
                     </div>
                 </div>
-            ) : (
-                <div className="bg-white rounded-[3.5rem] shadow-2xl p-10 w-full max-w-sm border-4 border-stone-100">
-                    <h2 className="text-4xl font-black text-emerald-500 mb-6">QUEST CLEAR!</h2>
-                    <div className="relative w-32 h-32 mx-auto mb-8">
-                        <img src="/Rick.png" alt="Rick" className="w-full h-full rounded-full shadow-lg border-4 border-white object-cover" />
-                    </div>
-                    <div className="bg-stone-50 p-6 rounded-3xl mb-8 text-left border-2 border-stone-100">
-                        <p className="text-sm font-black text-stone-700 leading-tight mb-4">あと <span className="text-2xl text-orange-500 mx-0.5">{remainingMin}</span> 分 の学習で<br/>お宝へのトビラが開くワン！🐾</p>
-                        <div className="w-full bg-stone-200 rounded-full h-4 shadow-inner p-1"><div className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full rounded-full transition-all" style={{ width: `${progP}%` }}></div></div>
-                    </div>
-                </div>
-            )}
-            <button onClick={() => setView('menu')} className={`mt-8 w-full max-w-sm py-5 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 border-b-8 ${isRRoom ? 'bg-slate-800 text-white' : 'bg-stone-800 text-white'}`}>村へもどる 🐾</button>
+            </div>
+            <button onClick={() => setView('menu')} className={`mt-8 w-full max-w-sm py-5 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 border-b-8 bg-stone-800 text-white`}>村へもどる 🐾</button>
         </div>
     );
   }
+
+  if (view === 'result_chest') {
+    return withGlobalTimer(
+        <div className={`min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center font-sans transition-colors duration-1000`}>
+            <div className="w-full max-w-lg animate-in fade-in zoom-in duration-700">
+                <div className="mb-8 text-left">
+                    <h2 className="text-4xl font-black text-yellow-400 mb-2">✨ 秘密の宝物庫 ✨</h2>
+                    <p className="text-sky-300 font-bold text-sm tracking-widest">宝箱をタップして豆知識を手にいれよう！</p>
+                </div>
+                <div className="grid grid-cols-2 gap-5 mb-10">
+                    {rewardTipsList.map((tip, idx) => {
+                        const isOpened = openedChests.includes(idx);
+                        return (
+                            <div key={idx} onClick={async () => {
+                                if(!isOpened) {
+                                    playSound('chest'); 
+                                    const nextOpened = [...openedChests, idx];
+                                    setOpenedChests(nextOpened); 
+                                    confetti({ particleCount: 30 });
+                                    
+                                    const currentTips = challengeSettings?.unlocked_tips || [];
+                                    if (!currentTips.includes(tip)) {
+                                        const nextTips = [...currentTips, tip];
+                                        setChallengeSettings((p:any) => ({...p, unlocked_tips: nextTips}));
+                                        await supabase.from('challenge_settings').update({ unlocked_tips: nextTips }).eq('target_user_id', currentUser.id);
+                                    }
+                                    
+                                    if (nextOpened.length === 2) {
+                                        const today = getTodayJST();
+                                        const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).single();
+                                        if (cLog) {
+                                            const doneEntry = { time: getJSTTimeString(), word: 'CHEST', mode: 'chest', result: 'done' };
+                                            await supabase.from('daily_logs').update({ details: [...(cLog.details || []), doneEntry] }).eq('id', cLog.id);
+                                            setDailyProgress((prev: any) => ({ ...prev, details: [...(prev.details || []), doneEntry] }));
+                                        }
+                                    }
+                                }
+                            }} className={`relative p-6 rounded-[2.5rem] border-2 transition-all duration-500 cursor-pointer transform active:scale-90 ${isOpened ? 'bg-slate-900/50 border-slate-800 scale-95 shadow-inner' : 'bg-gradient-to-b from-slate-800 to-slate-900 border-yellow-500/50 shadow-lg'}`}>
+                                {!isOpened && <div className="absolute inset-0 bg-yellow-400/5 rounded-[2.5rem] animate-pulse"></div>}
+                                <div className={`text-6xl mb-4 ${isOpened ? 'rotate-12 scale-110' : ''}`}>{isOpened ? '🎁' : '📦'}</div>
+                                <p className={`text-[11px] font-black leading-tight transition-colors ${isOpened ? 'text-sky-200' : 'text-yellow-600'}`}>
+                                    {isOpened ? (tip.startsWith('[マイクラ] ') ? tip.replace('[マイクラ] ', '') : tip.replace('[スプラ] ', '')) : '開ける！'}
+                                </p>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+            <button onClick={() => setView('menu')} className={`mt-8 w-full max-w-sm py-5 rounded-[2rem] font-black text-xl shadow-xl transition-all active:scale-95 border-b-8 bg-slate-800 text-white`}>村へもどる 🐾</button>
+        </div>
+    );
+  }
+
   return null;
 }

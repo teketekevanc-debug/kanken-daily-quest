@@ -28,6 +28,7 @@ type MenuScreenProps = {
   setAdminTargetUser: (user: any) => void;
   renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
   examMission: ExamMissionPhase;
+  openChestRoom: () => void;
 }
 
 export default function MenuScreen(props: MenuScreenProps) {
@@ -36,16 +37,17 @@ export default function MenuScreen(props: MenuScreenProps) {
     targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode,
     rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal,
     hasParentChallenge, startGame, setView, fetchCollection, renderCalendar,
-    stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission
+    stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission, openChestRoom
   } = props;
 
   const [showTipsModal, setShowTipsModal] = useState(false);
   const [tipSearchQuery, setTipSearchQuery] = useState('');
+  const [tipsTab, setTipsTab] = useState<'all' | 'minecraft' | 'splatoon'>('all');
   
   const [showKanjiList, setShowKanjiList] = useState(false);
   const [kanjiList, setKanjiList] = useState<any[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
-  const [listTab, setListTab] = useState<'learning' | 'mastered'>('learning');
+  const [listTab, setListTab] = useState<'learning' | 'mistakes' | 'mastered'>('learning');
 
   const openKanjiList = async () => {
     setShowKanjiList(true);
@@ -53,18 +55,23 @@ export default function MenuScreen(props: MenuScreenProps) {
     setListTab('learning');
 
     let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
-    if (targetKyu !== 'all') {
-      query = query.eq('kanji_level', targetKyu);
-    }
     query = query.order('id', { ascending: true }); 
     
     const { data: words } = await query;
-    const { data: progress } = await supabase.from('user_progress').select('question_id, status').eq('user_id', currentUser.id).limit(3000);
+    const { data: progress } = await supabase.from('user_progress').select('question_id, status, mistake_count').eq('user_id', currentUser.id).limit(3000);
 
     if (words) {
       const pMap = new Map();
-      progress?.forEach(p => pMap.set(p.question_id, p.status));
-      const merged = words.map(w => ({ ...w, currentStatus: pMap.get(w.id) || 'learning' }));
+      const mMap = new Map();
+      progress?.forEach(p => { 
+          pMap.set(p.question_id, p.status); 
+          mMap.set(p.question_id, p.mistake_count || 0); 
+      });
+      const merged = words.map(w => ({ 
+          ...w, 
+          currentStatus: pMap.get(w.id) || 'learning',
+          mistakeCount: mMap.get(w.id) || 0
+      }));
       setKanjiList(merged);
     }
     setIsLoadingList(false);
@@ -73,55 +80,65 @@ export default function MenuScreen(props: MenuScreenProps) {
   const handleToggleRemembered = async (word: any) => {
     const isMastered = word.currentStatus === 'gold';
     const newStatus = isMastered ? 'learning' : 'gold';
-
     setKanjiList(prev => prev.map(w => w.id === word.id ? { ...w, currentStatus: newStatus } : w));
-
     if (isMastered) {
       await supabase.from('user_progress').delete().eq('user_id', currentUser.id).eq('question_id', word.id);
     } else {
       await supabase.from('user_progress').upsert({
-        user_id: currentUser.id,
-        question_id: word.id,
-        status: 'gold',
-        last_reviewed_at: new Date().toISOString()
+        user_id: currentUser.id, question_id: word.id, status: 'gold', last_reviewed_at: new Date().toISOString()
       }, { onConflict: 'user_id, question_id' });
     }
   };
 
-  const streakData = [dailyProgress?.streak || 0];
-  const [streak] = streakData;
-
-  const goalData = [challengeSettings?.reward_goal_days || 14];
-  const [goal] = goalData;
-
-  const rewardTextData = [challengeSettings?.reward_text || '好きなおやつ'];
-  const [rewardName] = rewardTextData;
-
-  const tipsData = [challengeSettings?.unlocked_tips || []];
-  const [unlockedTips] = tipsData;
-  const filteredUnlockedTips = unlockedTips
-    .map((tip: string, index: number) => ({ tip, index }))
-    .filter(({ tip }: { tip: string; index: number }) => tip.toLocaleLowerCase().includes(tipSearchQuery.trim().toLocaleLowerCase()));
+  const unlockedTips = challengeSettings?.unlocked_tips || [];
   
-  const remainder = streak % goal;
-  const daysUntil = (remainder === 0 && streak > 0) ? goal : goal - remainder;
-  const nextRewardMsg = (remainder === 0 && streak > 0) 
-    ? `🎉 目標の${goal}日達成！${rewardName}をGET！` 
-    : `あと${daysUntil}日で${rewardName}！🎁`;
+  const parseTip = (tip: string) => {
+    if (tip.startsWith('[マイクラ] ')) return { type: 'minecraft', text: tip.replace('[マイクラ] ', '') };
+    if (tip.startsWith('[スプラ] ')) return { type: 'splatoon', text: tip.replace('[スプラ] ', '') };
+    
+    // ★ 過去データ（プレフィックスなし）の自動判定
+    if (tip.includes('/') || tip.includes('@') || tip.includes('コマンド') || tip.includes('ブロック') || tip.includes('エンティティ')) {
+        return { type: 'minecraft', text: tip };
+    }
+    if (tip.includes('ブキ') || tip.includes('インク') || tip.includes('ギア') || tip.includes('スペシャル') || tip.includes('イカ')) {
+        return { type: 'splatoon', text: tip };
+    }
+    
+    return { type: 'other', text: tip }; 
+  };
+
+  const filteredUnlockedTips = unlockedTips
+    .map((tip: string, index: number) => ({ tip, index, parsed: parseTip(tip) }))
+    .filter((item: any) => {
+       // ★ 厳密なフィルタリング
+       if (tipsTab === 'minecraft' && item.parsed.type !== 'minecraft') return false;
+       if (tipsTab === 'splatoon' && item.parsed.type !== 'splatoon') return false;
+       if (!item.parsed.text.toLocaleLowerCase().includes(tipSearchQuery.trim().toLocaleLowerCase())) return false;
+       return true;
+    })
+    .sort((a: any, b: any) => {
+       // ★ ジャンルでソート（マイクラ -> スプラ -> その他）
+       if (a.parsed.type < b.parsed.type) return -1;
+       if (a.parsed.type > b.parsed.type) return 1;
+       return a.index - b.index; // 同じジャンルなら古い順
+    });
 
   const isRickDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['rick_challenge'] && d.result === 'done'); 
   const isParentDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['parent_challenge'] && d.result === 'done'); 
   const isWeekendDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['weekend'] && d.result === 'done'); 
-  
-  const displayCountData = [challengeSettings?.quest_count || 5];
-  const [displayCount] = displayCountData;
+  const displayCount = challengeSettings?.quest_count || 5;
+
+  const tS = dailyProgress?.study_time_seconds || 0;
+  const is10MinDone = tS >= 600;
+  const isMission100Done = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['mission_100'] && d.result === 'done');
+  const hasOpenedChest = dailyProgress?.details?.some((d: any) => d.mode === 'chest' && d.result === 'done');
+  const canOpenChest = is10MinDone && isMission100Done && !hasOpenedChest;
 
   const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
   const today = getJSTDate();
   today.setHours(0, 0, 0, 0);
-  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
   const examDayUtc = Date.UTC(2027, 1, 1);
-  const diffDays = Math.ceil((examDayUtc - todayUtc) / (1000 * 60 * 60 * 24));
+  const diffDays = Math.ceil((examDayUtc - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / (1000 * 60 * 60 * 24));
 
   return (
     <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans transition-colors duration-500`}>
@@ -138,15 +155,8 @@ export default function MenuScreen(props: MenuScreenProps) {
         <img src="/Rick.png" alt="Rick" className="w-full h-full object-cover" />
         <div className="absolute bottom-0 left-0 right-0 bg-stone-900/40 text-white text-[10px] text-center font-bold py-0.5 backdrop-blur-sm tracking-widest">ナビゲーター</div>
       </div>
-      <h1 className={`text-3xl font-black ${currentUser.text} mb-2 tracking-widest drop-shadow-sm`}>毎日受験クエスト</h1>
+      <h1 className={`text-3xl font-black ${currentUser.text} mb-4 tracking-widest drop-shadow-sm`}>毎日受験クエスト</h1>
 
-      <button
-        onClick={fetchCollection}
-        className="mb-5 w-full max-w-sm rounded-2xl border-b-4 border-emerald-600 bg-emerald-500 px-5 py-4 text-base font-black text-white shadow-md transition active:translate-y-1 active:border-b-0 flex items-center justify-center gap-2"
-      >
-        <span className="text-xl">📖</span> 1日10分カード
-      </button>
-      
       <div className="w-full max-w-sm bg-gradient-to-r from-rose-50 to-orange-50 border-4 border-rose-200 p-4 rounded-3xl shadow-sm mb-4 flex items-center justify-between relative overflow-hidden">
         <div className="absolute -right-4 -bottom-4 text-7xl opacity-20">🔥</div>
         <div className="relative z-10">
@@ -160,7 +170,7 @@ export default function MenuScreen(props: MenuScreenProps) {
         <div className="text-5xl relative z-10 drop-shadow-md animate-bounce">📝</div>
       </div>
 
-      <section className="mb-5 w-full max-w-sm rounded-3xl border-2 border-indigo-200 bg-white p-4 shadow-md">
+      <section className="mb-4 w-full max-w-sm rounded-3xl border-2 border-indigo-200 bg-white p-4 shadow-md">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-black tracking-widest text-indigo-500">🎯 多摩大目黒（特待）・桐光学園</p>
@@ -178,7 +188,7 @@ export default function MenuScreen(props: MenuScreenProps) {
             : examMission.focus}
         </p>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {(examMission.categoryIds.length ? examMission.categoryIds : ['exam_kyu6', 'exam_kyu5', 'kyu4', 'idiom', 'synonym_antonym'])
+          {(examMission.categoryIds.length ? examMission.categoryIds : ['exam_frequent', 'idiom', 'synonym_antonym'])
             .map(id => CATEGORIES.find(category => category.id === id))
             .filter((category): category is (typeof CATEGORIES)[number] => Boolean(category))
             .map(category => (
@@ -195,9 +205,15 @@ export default function MenuScreen(props: MenuScreenProps) {
         </button>
       </section>
 
-      {/* ★ 移動：受験モード（手書き弱点特訓）を合格ミッションの直下に配置 */}
       <button onClick={() => startGame('exam')} className="mb-6 w-full max-w-sm py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-rose-600 text-white border-b-4 border-rose-800 hover:bg-rose-500 active:translate-y-1 active:border-b-0 tracking-widest gap-2">
         <span className="text-xl">🔥</span> 受験モード (手書き弱点特訓)
+      </button>
+
+      <button
+        onClick={fetchCollection}
+        className="mb-8 w-full max-w-sm rounded-3xl border-b-4 border-emerald-600 bg-emerald-500 px-5 py-5 text-lg font-black text-white shadow-lg transition active:translate-y-1 active:border-b-0 flex items-center justify-center gap-3"
+      >
+        <span className="text-2xl">📖</span> 言葉の図鑑 (1日10分カード)
       </button>
 
       <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">
@@ -209,6 +225,8 @@ export default function MenuScreen(props: MenuScreenProps) {
           </div>
           <select value={targetKyu} onChange={e => setTargetKyu(e.target.value)} className="w-full p-3 border-2 border-stone-200 rounded-xl text-sm font-black text-stone-700 bg-stone-50 outline-none focus:border-sky-400 mb-5 text-center shadow-inner">
             <option value="all">すべてのカテゴリから出題</option>
+            <option value="mistakes">🔥 間違えた漢字 (1回以上ミス)</option>
+            <option value="hard">💀 覚えにくい漢字 (2回以上ミス)</option>
             {CATEGORIES.filter((c: any) => c.id !== 'general').map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
 
@@ -237,50 +255,47 @@ export default function MenuScreen(props: MenuScreenProps) {
       </div>
       
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-5 mb-5 border-b-4 border-stone-200 relative overflow-hidden">
-          <div className="absolute -right-4 -top-4 text-6xl opacity-10">🔥</div>
-          <p className="text-xs font-black text-sky-600 mb-2 animate-pulse">{getDailyMessage(currentUser.id)}</p>
+          <p className="text-xs font-black text-sky-600 mb-3 animate-pulse">{getDailyMessage(currentUser.id)}</p>
           
-          <div className="flex justify-between items-center mb-4 px-2">
-            <div className="text-left">
-              <p className="text-[10px] text-stone-400 font-bold mb-0.5">現在の連続クリア</p>
-              <p className="text-4xl font-black text-orange-500 tracking-tighter">{streak} <span className="text-lg">日</span></p>
-            </div>
-            <div className="text-right bg-yellow-50 p-2 rounded-2xl border-2 border-yellow-100 shadow-inner min-w-[100px]">
-              <p className="text-[9px] font-black text-yellow-600 mb-0.5">持っている数</p>
-              <p className="text-2xl font-black text-yellow-500">{challengeSettings?.owned_rewards || 0} <span className="text-xs">個</span></p>
-            </div>
-          </div>
-
-          <div className="bg-orange-50 border border-orange-200 text-orange-600 font-black py-2 px-4 rounded-2xl text-sm inline-block shadow-sm w-full mb-3">
-            {nextRewardMsg}
-          </div>
-
-          <div className="mt-3 border-t border-stone-100 pt-3">
-            <details className="group">
-              <summary className="list-none cursor-pointer">
-                <div className="text-[10px] font-black text-stone-400 flex items-center justify-center gap-1 group-open:text-sky-500 transition-colors">
-                  <span>📜</span> ご褒美をもらうためのヒント 
-                  <span className="transition-transform group-open:rotate-180">▼</span>
-                </div>
-              </summary>
-              <div className="mt-2 bg-stone-50 p-3 rounded-xl text-[11px] font-bold text-stone-600 leading-relaxed text-left animate-in fade-in slide-in-from-top-1">
-                <p>・しっかり集中して、漢字の世界を冒険しよう！</p>
-                <p>・10分くらい、問題を解いたり図鑑をながめていると、クリアしたあとに宝箱が出るかも...？</p>
-                <p>・「手書き」や「自己判定」で頑張ると、いいことがあるかも！？</p>
-                <p className="text-[9px] text-stone-400 mt-2">※ 途中で画面を閉じると、時間はリセットされるから注意してね！</p>
+          <div className="bg-stone-50 rounded-2xl p-4 border-2 border-stone-100 mb-4">
+              <p className="text-[10px] font-black text-stone-400 mb-2">🎁 今日の宝箱への道のり</p>
+              <div className="space-y-2 text-left">
+                  <div className="flex items-center gap-2">
+                      <span className="text-xl">{is10MinDone ? '✅' : '🔲'}</span>
+                      <span className={`text-xs font-bold ${is10MinDone ? 'text-emerald-600' : 'text-stone-500'}`}>1日10分のカード学習</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <span className="text-xl">{isMission100Done ? '✅' : '🔲'}</span>
+                      <span className={`text-xs font-bold ${isMission100Done ? 'text-emerald-600' : 'text-stone-500'}`}>合格ミッションのクリア</span>
+                  </div>
               </div>
-            </details>
           </div>
+
+          {canOpenChest ? (
+              <button 
+                  onClick={openChestRoom} 
+                  className="w-full bg-gradient-to-b from-yellow-400 to-amber-500 text-white font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center gap-2 shadow-[0_5px_0_0_#d97706] hover:brightness-110 mb-2 animate-bounce"
+              >
+                  <span className="text-2xl">✨</span> 
+                  <span className="tracking-widest">今日の宝箱を開ける！</span>
+              </button>
+          ) : hasOpenedChest ? (
+              <div className="w-full bg-stone-200 text-stone-400 font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-inner mb-2">
+                  <span className="text-2xl grayscale opacity-50">🎁</span> 
+                  <span className="tracking-widest">今日の宝箱は開封済み</span>
+              </div>
+          ) : (
+              <div className="w-full bg-stone-100 text-stone-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-inner mb-2 border border-dashed border-stone-300">
+                  <span className="text-sm">🔒 条件達成で宝箱が出現！</span>
+              </div>
+          )}
 
           <button 
             onClick={() => setShowTipsModal(true)} 
-            className="w-full bg-gradient-to-b from-amber-700 to-amber-900 text-amber-100 font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center gap-3 shadow-[0_5px_0_0_rgba(69,26,3,1)] hover:brightness-110 mb-2 mt-4"
+            className="w-full bg-stone-800 text-stone-100 font-black py-3 rounded-2xl active:scale-95 transition flex items-center justify-center gap-2 shadow-sm hover:bg-stone-700 mt-3"
           >
-            <span className="text-2xl">🎁</span>
-            <div className="text-left leading-tight">
-              <p className="text-[10px] text-amber-300/80">あつめたお宝</p>
-              <p className="text-sm tracking-widest">豆知識コレクション ({unlockedTips.length})</p>
-            </div>
+            <span className="text-xl">📚</span>
+            <span className="text-xs tracking-widest">豆知識ノート ({unlockedTips.length})</span>
           </button>
       </div>
 
@@ -387,7 +402,10 @@ export default function MenuScreen(props: MenuScreenProps) {
               <button onClick={() => setListTab('learning')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'learning' ? 'bg-white text-sky-700 shadow-sm border-2 border-sky-100' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
                 未習得 ({kanjiList.filter(w => w.currentStatus !== 'gold').length})
               </button>
-              <button onClick={() => setListTab('mastered')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'mastered' ? 'bg-white text-amber-600 shadow-sm border-2 border-amber-100' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
+              <button onClick={() => setListTab('mistakes')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'mistakes' ? 'bg-rose-50 text-rose-600 shadow-sm border-2 border-rose-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
+                要復習 ({kanjiList.filter(w => w.mistakeCount > 0 && w.currentStatus !== 'gold').length})
+              </button>
+              <button onClick={() => setListTab('mastered')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'mastered' ? 'bg-amber-50 text-amber-600 shadow-sm border-2 border-amber-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
                 覚えた！ ({kanjiList.filter(w => w.currentStatus === 'gold').length})
               </button>
             </div>
@@ -398,33 +416,50 @@ export default function MenuScreen(props: MenuScreenProps) {
                   <div className="animate-spin text-4xl mb-4">🌀</div>
                   <p className="font-bold text-sm tracking-widest">読み込み中...</p>
                 </div>
-              ) : kanjiList.filter(w => listTab === 'mastered' ? w.currentStatus === 'gold' : w.currentStatus !== 'gold').length > 0 ? (
-                kanjiList.filter(w => listTab === 'mastered' ? w.currentStatus === 'gold' : w.currentStatus !== 'gold').map((w, i) => (
-                  <div key={w.id} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-stone-100 flex items-center gap-4">
-                    <div className="shrink-0 flex flex-col items-center justify-center bg-stone-50 w-14 h-14 rounded-xl border border-stone-100">
-                      <span className="text-2xl font-black text-stone-800">{w.kanji}</span>
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="text-base font-black text-sky-700 mb-1">{renderReading(w.reading, w.okurigana)}</p>
-                      {w.sentence && <p className="text-[10px] font-bold text-stone-500 leading-snug">{w.sentence.replace('□', '〇')}</p>}
-                    </div>
-                    <button 
-                      onClick={() => handleToggleRemembered(w)} 
-                      className={`shrink-0 px-3 py-2 rounded-xl text-[10px] font-black transition-all border-b-2 active:translate-y-0.5 active:border-b-0 ${
-                        w.currentStatus === 'gold' 
-                          ? 'bg-stone-100 text-stone-400 border-stone-200 hover:bg-stone-200' 
-                          : 'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200'
-                      }`}
-                    >
-                      {w.currentStatus === 'gold' ? '戻す' : '👑 覚えた'}
-                    </button>
-                  </div>
-                ))
               ) : (
-                <div className="text-center py-20">
-                  <p className="text-4xl mb-4">📭</p>
-                  <p className="text-stone-400 font-bold text-sm">このリストにはまだ<br/>漢字がないよ！</p>
-                </div>
+                (() => {
+                  const filteredList = kanjiList.filter(w => {
+                    if (listTab === 'mastered') return w.currentStatus === 'gold';
+                    if (listTab === 'mistakes') return w.mistakeCount > 0 && w.currentStatus !== 'gold';
+                    return w.currentStatus !== 'gold';
+                  });
+
+                  if (filteredList.length === 0) {
+                    return (
+                      <div className="text-center py-20">
+                        <p className="text-4xl mb-4">{listTab === 'mistakes' ? '✨' : '📭'}</p>
+                        <p className="text-stone-400 font-bold text-sm">このリストにはまだ<br/>漢字がないよ！</p>
+                      </div>
+                    );
+                  }
+
+                  return filteredList.map((w, i) => (
+                    <div key={w.id} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-stone-100 flex items-center gap-4">
+                      <div className="shrink-0 flex flex-col items-center justify-center bg-stone-50 w-14 h-14 rounded-xl border border-stone-100">
+                        <span className="text-2xl font-black text-stone-800">{w.kanji}</span>
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-base font-black text-sky-700">{renderReading(w.reading, w.okurigana)}</p>
+                          {w.mistakeCount > 0 && (
+                            <span className="text-[9px] bg-rose-100 text-rose-600 font-black px-1.5 py-0.5 rounded shadow-sm">ミス: {w.mistakeCount}回</span>
+                          )}
+                        </div>
+                        {w.sentence && <p className="text-[10px] font-bold text-stone-500 leading-snug">{w.sentence.replace('□', '〇')}</p>}
+                      </div>
+                      <button 
+                        onClick={() => handleToggleRemembered(w)} 
+                        className={`shrink-0 px-3 py-2 rounded-xl text-[10px] font-black transition-all border-b-2 active:translate-y-0.5 active:border-b-0 ${
+                          w.currentStatus === 'gold' 
+                            ? 'bg-stone-100 text-stone-400 border-stone-200 hover:bg-stone-200' 
+                            : 'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200'
+                        }`}
+                      >
+                        {w.currentStatus === 'gold' ? '戻す' : '👑 覚えた'}
+                      </button>
+                    </div>
+                  ));
+                })()
               )}
             </div>
           </div>
@@ -433,48 +468,61 @@ export default function MenuScreen(props: MenuScreenProps) {
 
       {showTipsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in" onClick={() => setShowTipsModal(false)}>
-          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
             
-            <div className="bg-yellow-50 p-6 text-center border-b-4 border-yellow-100 shrink-0">
-              <h3 className="text-2xl font-black text-yellow-600 flex items-center justify-center gap-2"><span>📚</span> 秘密の豆知識ノート</h3>
-              <p className="text-xs font-bold text-yellow-700 mt-2">今まで集めた知識：{unlockedTips.length}個</p>
+            <div className="bg-stone-50 p-5 text-center border-b-4 border-stone-200 shrink-0">
+              <h3 className="text-xl font-black text-stone-700 flex items-center justify-center gap-2"><span>📚</span> 豆知識ノート</h3>
               <input
                 type="search"
                 value={tipSearchQuery}
                 onChange={(event) => setTipSearchQuery(event.target.value)}
                 placeholder="キーワードで検索..."
                 aria-label="豆知識を検索"
-                className="mt-4 w-full rounded-xl border border-yellow-200 bg-white px-4 py-3 text-base font-bold text-stone-700 outline-none focus:border-yellow-400"
+                className="mt-4 w-full rounded-xl border-2 border-stone-200 bg-white px-4 py-3 text-sm font-bold text-stone-700 outline-none focus:border-sky-400"
               />
-              <p className="mt-2 text-left text-xs font-bold text-yellow-800">{filteredUnlockedTips.length}件を表示</p>
+            </div>
+
+            <div className="flex p-2 bg-stone-100 shrink-0 gap-2 border-b border-stone-200">
+              <button onClick={() => setTipsTab('all')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'all' ? 'bg-white text-stone-700 shadow-sm border-2 border-stone-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
+                すべて
+              </button>
+              <button onClick={() => setTipsTab('minecraft')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'minecraft' ? 'bg-emerald-50 text-emerald-700 shadow-sm border-2 border-emerald-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
+                マイクラ
+              </button>
+              <button onClick={() => setTipsTab('splatoon')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'splatoon' ? 'bg-yellow-50 text-yellow-600 shadow-sm border-2 border-yellow-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
+                スプラ
+              </button>
             </div>
             
-            <div className="p-6 overflow-y-auto bg-stone-50 flex-1 space-y-3 no-scrollbar">
+            <div className="p-4 overflow-y-auto bg-stone-50 flex-1 space-y-3 no-scrollbar">
               {filteredUnlockedTips.length > 0 ? (
-                filteredUnlockedTips.map(({ tip, index }: { tip: string; index: number }) => (
-                  <article key={`${index}-${tip}`} className="bg-white p-4 rounded-2xl shadow-sm border border-stone-200">
-                    <div className="flex items-start gap-3">
+                filteredUnlockedTips.map(({ tip, index, parsed }: { tip: string; index: number; parsed: any }) => (
+                  <article key={`${index}-${tip}`} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-stone-100 relative overflow-hidden">
+                    {parsed.type === 'minecraft' && <span className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-sm">マイクラ</span>}
+                    {parsed.type === 'splatoon' && <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-sm">スプラ</span>}
+                    
+                    <div className="flex items-start gap-3 mt-1">
                       <span className="shrink-0 text-xl" aria-hidden="true">📜</span>
-                      <p className="min-w-0 flex-1 break-words text-sm font-bold text-stone-700 leading-relaxed">{tip}</p>
+                      <p className="min-w-0 flex-1 break-words text-sm font-bold text-stone-700 leading-relaxed">{parsed.text}</p>
                     </div>
-                    <p className="mt-2 text-right text-[10px] font-black text-stone-400">豆知識 #{index + 1}</p>
+                    <p className="mt-2 text-right text-[10px] font-black text-stone-300">豆知識 #{index + 1}</p>
                   </article>
                 ))
               ) : unlockedTips.length > 0 ? (
                 <div className="py-10 text-center">
                   <p className="text-3xl mb-3">🔎</p>
-                  <p className="font-bold text-stone-500">一致する豆知識がありません</p>
+                  <p className="font-bold text-stone-400">一致する豆知識がありません</p>
                 </div>
               ) : (
                 <div className="text-center py-10">
                   <p className="text-4xl mb-4">🔒</p>
-                  <p className="text-stone-400 font-bold leading-relaxed">まだ豆知識がありません。<br/>10分しっかり勉強して<br/>クリア後の宝箱を開けよう！</p>
+                  <p className="text-stone-400 font-bold leading-relaxed">まだ豆知識がありません。<br/>10分学習とミッションをクリアして<br/>宝箱を開けよう！</p>
                 </div>
               )}
             </div>
             
             <div className="p-4 bg-white border-t border-stone-100 shrink-0">
-              <button onClick={() => setShowTipsModal(false)} className="w-full py-4 bg-stone-800 text-white rounded-2xl font-black text-lg shadow-lg active:scale-95 transition">村へもどる 🐾</button>
+              <button onClick={() => setShowTipsModal(false)} className="w-full py-4 bg-stone-800 text-white rounded-2xl font-black text-lg shadow-lg active:scale-95 transition">閉じる ✖</button>
             </div>
             
           </div>
