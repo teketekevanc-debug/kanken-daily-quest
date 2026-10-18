@@ -149,6 +149,14 @@ export default function CollectionScreen(props: CollectionScreenProps) {
       }
     };
 
+    // ★ ポップアップの漢字表示用（4字熟語なら2文字で改行する）
+    const formatPopupKanji = (text: string) => {
+        if (text && text.length === 4 && !text.includes('\n')) {
+            return <>{text.slice(0, 2)}<br />{text.slice(2)}</>;
+        }
+        return text;
+    };
+
     return (
         <div className={`min-h-screen ${currentUser.light} p-4 font-sans pb-24`}>
           <div className="max-w-2xl mx-auto">
@@ -393,28 +401,32 @@ export default function CollectionScreen(props: CollectionScreenProps) {
             )}
           </div>
 
+          {/* ★ ポップアップのレイアウト調整部分 */}
           {selectedIndex !== null && (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center overflow-y-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 bg-stone-900/80 backdrop-blur-md animate-in fade-in" onClick={() => setSelectedIndex(null)}>
-              <div className="bg-white w-[min(88vw,42rem)] max-w-2xl max-h-[72dvh] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[2rem] sm:rounded-[3rem] p-4 pt-14 sm:p-8 sm:pt-16 relative flex flex-col items-center justify-start shadow-2xl animate-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-md animate-in fade-in" onClick={() => setSelectedIndex(null)}>
+              <div className="bg-white w-[95vw] sm:w-[min(88vw,42rem)] max-w-2xl h-[88dvh] sm:h-auto sm:max-h-[90dvh] flex flex-col overflow-y-auto rounded-[2.5rem] sm:rounded-[3rem] p-4 sm:p-8 relative shadow-2xl animate-in zoom-in duration-300" onClick={(e) => e.stopPropagation()}>
                 
-                <button onClick={() => setSelectedIndex(null)} className="absolute top-3 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-stone-100 text-stone-500 hover:text-stone-700 text-2xl font-black" aria-label="閉じる">✖</button>
+                <button onClick={() => setSelectedIndex(null)} className="absolute top-4 right-4 flex h-11 w-11 items-center justify-center rounded-full bg-stone-100 text-stone-500 hover:text-stone-700 text-2xl font-black z-10" aria-label="閉じる">✖</button>
                 
-                <div className="flex items-center justify-between w-full mt-4">
+                <div className="flex items-stretch justify-between w-full flex-1 mt-6">
                   <button 
                     onClick={() => {
                       setSelectedIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
                       setIsAnswerRevealed(false);
                     }}
                     disabled={selectedIndex === 0}
-                    className={`shrink-0 text-3xl sm:text-6xl transition-all p-1 sm:p-4 ${selectedIndex === 0 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
+                    className={`shrink-0 flex items-center justify-center text-3xl sm:text-6xl transition-all p-2 sm:p-4 ${selectedIndex === 0 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
                   >◀</button>
 
-                    <div className="min-w-0 flex-1 text-center px-1 sm:px-4 flex flex-col items-center animate-in zoom-in duration-300" key={selectedIndex}>
-                    <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">{filteredWords[selectedIndex].emoji}</div>
-                    <h2 className="text-5xl sm:text-[8rem] md:text-[10rem] font-black text-stone-800 leading-none mb-4 sm:mb-6 drop-shadow-md break-words whitespace-pre-wrap max-w-full">
-                      {flashcardMode === 'hide_kanji' && !isAnswerRevealed ? '？' : filteredWords[selectedIndex].kanji}
+                  <div className="min-w-0 flex-1 text-center px-1 sm:px-4 flex flex-col items-center justify-center h-full animate-in zoom-in duration-300" key={selectedIndex}>
+                    <div className="text-4xl sm:text-6xl mb-3 sm:mb-4 shrink-0">{filteredWords[selectedIndex].emoji}</div>
+                    
+                    {/* ★ 四字熟語バランス対応 */}
+                    <h2 className="text-[3.5rem] sm:text-[6rem] md:text-[8rem] font-black text-stone-800 leading-tight mb-5 sm:mb-6 drop-shadow-md break-words shrink-0">
+                      {flashcardMode === 'hide_kanji' && !isAnswerRevealed ? '？' : formatPopupKanji(filteredWords[selectedIndex].kanji)}
                     </h2>
-                    <div className="flex max-w-full flex-wrap items-center justify-center gap-2 sm:gap-4 bg-sky-50 py-3 px-3 sm:px-8 rounded-full border-4 border-sky-100 shadow-sm">
+                    
+                    <div className="flex max-w-full flex-wrap items-center justify-center gap-2 sm:gap-4 bg-sky-50 py-3 px-3 sm:px-8 rounded-[2rem] border-4 border-sky-100 shadow-sm shrink-0">
                       <p className="text-2xl sm:text-4xl md:text-5xl font-black leading-tight text-sky-700 break-words whitespace-normal">
                         {flashcardMode === 'hide_reading' && !isAnswerRevealed ? '？？？' : renderReading(filteredWords[selectedIndex].reading, filteredWords[selectedIndex].okurigana)}
                       </p>
@@ -427,14 +439,14 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                     </div>
                     
                     {filteredWords[selectedIndex].usage_example && (
-                      <p className="mt-6 text-xl font-bold text-stone-600">
+                      <p className="mt-6 text-xl font-bold text-stone-600 shrink-0">
                         「{filteredWords[selectedIndex].usage_example.replace('□', '〇')}」
                       </p>
                     )}
                     {filteredWords[selectedIndex].origin_logic && (
-                       <div className="mt-4 bg-amber-50 p-4 rounded-2xl border-2 border-amber-100">
+                       <div className="mt-4 bg-amber-50 p-4 rounded-2xl border-2 border-amber-100 shrink-0 text-left w-full">
                          <span className="text-sm font-black text-amber-500 block mb-1">📜 なりたち</span>
-                         <p className="text-lg font-bold text-amber-900/80">{filteredWords[selectedIndex].origin_logic}</p>
+                         <p className="text-base sm:text-lg font-bold text-amber-900/80">{filteredWords[selectedIndex].origin_logic}</p>
                        </div>
                     )}
 
@@ -443,7 +455,7 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                         toggleArchiveStatus(filteredWords[selectedIndex].id, filteredWords[selectedIndex].currentStatus || 'learning');
                         setSelectedIndex(null);
                       }}
-                      className="mt-6 bg-stone-100 hover:bg-stone-200 text-stone-500 font-black py-3 px-6 rounded-xl transition-colors shadow-sm text-sm border-2 border-stone-200"
+                      className="mt-6 bg-stone-100 hover:bg-stone-200 text-stone-500 font-black py-3 px-6 rounded-xl transition-colors shadow-sm text-sm border-2 border-stone-200 shrink-0"
                     >
                       {filteredWords[selectedIndex].currentStatus === 'archived' ? '✨ アーカイブから戻す' : '📦 この漢字をアーカイブする'}
                     </button>
@@ -451,12 +463,13 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                     {flashcardMode !== 'normal' && !isAnswerRevealed && (
                       <button
                         onClick={() => setIsAnswerRevealed(true)}
-                        className="mt-5 rounded-2xl bg-sky-600 px-8 py-3 text-sm font-black text-white shadow-md transition active:scale-95"
+                        className="mt-5 rounded-2xl bg-sky-600 px-8 py-3 text-sm font-black text-white shadow-md transition active:scale-95 shrink-0"
                       >
                         答えを見る
                       </button>
                     )}
-                    <div className="mt-6 grid w-full max-w-md grid-cols-2 gap-3">
+                    
+                    <div className="mt-6 grid w-full max-w-md grid-cols-2 gap-3 shrink-0">
                       <button
                         onClick={() => onSelfJudge?.(filteredWords[selectedIndex], false)}
                         disabled={flashcardMode !== 'normal' && !isAnswerRevealed}
@@ -480,11 +493,11 @@ export default function CollectionScreen(props: CollectionScreenProps) {
                       setIsAnswerRevealed(false);
                     }}
                     disabled={selectedIndex === filteredWords.length - 1}
-                    className={`shrink-0 text-3xl sm:text-6xl transition-all p-1 sm:p-4 ${selectedIndex === filteredWords.length - 1 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
+                    className={`shrink-0 flex items-center justify-center text-3xl sm:text-6xl transition-all p-2 sm:p-4 ${selectedIndex === filteredWords.length - 1 ? 'text-stone-200 cursor-not-allowed' : 'text-sky-500 active:scale-90 hover:text-sky-600'}`}
                   >▶</button>
                 </div>
                 
-                <p className="mt-6 text-stone-400 font-bold tracking-widest">
+                <p className="mt-4 mb-2 text-stone-400 font-bold tracking-widest shrink-0 text-center w-full">
                   {selectedIndex + 1} / {filteredWords.length}
                 </p>
               </div>
