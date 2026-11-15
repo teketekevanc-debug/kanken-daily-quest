@@ -37,7 +37,6 @@ export type DailyLog = {
   study_time_seconds: number;
 };
 
-// ★ エラーの原因だった ProgressStats をここに追加しています
 export type ProgressStats = {
   total: number;
   mastered: number;
@@ -59,7 +58,13 @@ export const USERS = [
 
 // 受験対策・分野別の教材カテゴリ
 export const CATEGORIES = [
-  { id: 'v2_rank_a', name: '【新】ランクA（最頻出）' },
+  // ★ ここをランクAのジャンル別に変更・追加しました
+  { id: 'v2_rank_a', name: '【新】ランクA（書き取り・読み）' },
+  { id: 'v2_rank_a_yoji', name: '【新】ランクA（四字熟語）' },
+  { id: 'v2_rank_a_kanyou', name: '【新】ランクA（慣用句・ことわざ）' },
+  { id: 'v2_rank_a_douon', name: '【新】ランクA（同音・同訓異字）' },
+  { id: 'v2_rank_a_taigi', name: '【新】ランクA（対義語）' },
+
   { id: 'v2_rank_b', name: '【新】ランクB（頻出）' },
   { id: 'v2_rank_c', name: '【新】ランクC（差がつく）' },
   { id: 'v2_idiom_read', name: '【新】難読・特殊な読み' },
