@@ -1,3 +1,4 @@
+// app/page.tsx
 'use client'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from "@/lib/supabaseClient";
@@ -66,7 +67,7 @@ export default function Home() {
   }, [stopSpeaking]);
 
   const getFullReading = useCallback((reading: string, okurigana?: string | null) => okurigana ? `${reading}${okurigana}` : reading, []);
-const renderReading = useCallback((reading: string, okurigana?: string | null) => {
+  const renderReading = useCallback((reading: string, okurigana?: string | null) => {
     if (!okurigana) return <span>{reading}</span>;
     return <span>{reading}<span className="text-sm text-stone-700">{okurigana}</span></span>;
   }, []);
@@ -107,19 +108,14 @@ const renderReading = useCallback((reading: string, okurigana?: string | null) =
     const init = async () => {
       await checkDailyProgress();
       await fetchMonthlyLogs(calendarDate);
-      await fetchAllWordsForEdit(currentUser); // 起動時に現在のユーザーの全単語を読み込む
+      await fetchAllWordsForEdit(currentUser);
     };
     init();
   }, [currentUser.id, calendarDate, fetchMonthlyLogs, checkDailyProgress, fetchAllWordsForEdit]);
 
-  // 自分ノート（⭐）の切り替え処理
   const toggleMyNoteStatus = async (id: number, isCurrentlyMyNote: boolean) => {
     const newStatus = isCurrentlyMyNote ? 'archived' : 'mynote';
-    
-    // UIの即時反映
     setAllWordsList(prev => prev.map(w => w.id === id ? { ...w, currentStatus: newStatus } : w));
-    
-    // DB更新
     const { data: pD } = await supabase.from('user_progress').select('mistake_count').eq('user_id', currentUser.id).eq('question_id', id).maybeSingle();
     await supabase.from('user_progress').upsert({
       user_id: currentUser.id, 
@@ -135,9 +131,7 @@ const renderReading = useCallback((reading: string, okurigana?: string | null) =
     setMode(selectedMode);
     await fetchAllWordsForEdit(currentUser);
 
-    // アーカイブされていない、新カテゴリ（v2_〜）の単語だけを出題対象にする
     let activeWords = allWordsList.filter(w => w.currentStatus !== 'archived' && w.kanji_level?.startsWith('v2_'));
-
     const reviewCandidates = activeWords.filter(w => w.mistakeCount > 0 && w.currentStatus !== 'gold');
     const newCandidates = activeWords.filter(w => w.currentStatus === 'learning' || !w.currentStatus);
 
@@ -161,7 +155,6 @@ const renderReading = useCallback((reading: string, okurigana?: string | null) =
     if (isProcessing) return;
     setIsProcessing(true);
     const [cur] = questQueue.slice(currentIndex);
-
     const today = getTodayJST();
     const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).maybeSingle();
 
@@ -210,7 +203,6 @@ const renderReading = useCallback((reading: string, okurigana?: string | null) =
       last_reviewed_at: new Date().toISOString()
     }, { onConflict: 'user_id, question_id' });
 
-    // ローカルのリストも更新しておく
     setAllWordsList(prev => prev.map(w => w.id === cur.id ? { ...w, currentStatus: ns, mistakeCount: newMistakeCount } : w));
 
     stopSpeaking();
@@ -269,7 +261,6 @@ const renderReading = useCallback((reading: string, okurigana?: string | null) =
     });
     ranks.learning = Math.max(0, (totalCount || 0) - ranks.gold - ranks.silver - ranks.bronze);
     
-    // ★追加: 過去30日間のログを取得してグラフ用のデータを作る
     const thirtyDaysAgo = getJSTDate(); 
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const { data: logD } = await supabase.from('daily_logs').select('*').eq('user_id', targetUser.id).gte('date', formatDate(thirtyDaysAgo)).order('date', { ascending: true });
@@ -294,6 +285,7 @@ const renderReading = useCallback((reading: string, okurigana?: string | null) =
     
     setLoading(false);
   }, [calendarDate, fetchMonthlyLogs, getFullReading]);
+
   const renderCalendar = useCallback(() => {
     const y = calendarDate.getFullYear(); const m = calendarDate.getMonth();
     const daysInMonth = new Date(y, m + 1, 0).getDate(); const firstDay = new Date(y, m, 1).getDay();
@@ -331,7 +323,6 @@ const renderReading = useCallback((reading: string, okurigana?: string | null) =
     );
   }, [calendarDate, monthlyLogs, navTo]);
 
-  // --- 表示のルーティング ---
   if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, startGame, setView: navTo, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser}} />;
   if (view === 'game') return <PracticeScreen {...{currentUser, questQueue, currentIndex, canvasRef, startDrawing, draw, stopDrawing, clearCanvas, handleSelfJudge, renderReading, speakWord, getFullReading, setView: navTo}} />;
   
@@ -350,17 +341,3 @@ const renderReading = useCallback((reading: string, okurigana?: string | null) =
 
   return null;
 }
-
-// --- 型定義（追加） ---
-export type ProgressStats = {
-  total: number;
-  mastered: number;
-  ranks: { learning: number; bronze: number; silver: number; gold: number; };
-  weakWords: any[];
-  checkWords: any[];
-  recentLogs: any[];
-  graphData: any[];
-  pieData: any[];
-};
-
-export type KanjiWord = any;

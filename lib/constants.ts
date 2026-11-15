@@ -1,6 +1,6 @@
 // lib/constants.ts
-// --- 型定義 ---
 
+// --- 型定義 ---
 export type KanjiWord = {
   id: number;
   kanji: string;
@@ -22,8 +22,8 @@ export type ActivityLog = {
   word: string;
   mode: string;
   result: 'correct' | 'incorrect' | 'done';
-  timeSpent?: number; // ★追加：解答にかかった秒数
-  taskType?: 'new' | 'review'; // ★追加：新規か復習か
+  timeSpent?: number;
+  taskType?: 'new' | 'review';
 };
 
 export type DailyLog = {
@@ -37,8 +37,19 @@ export type DailyLog = {
   study_time_seconds: number;
 };
 
-// --- 定数データ ---
+// ★ エラーの原因だった ProgressStats をここに追加しています
+export type ProgressStats = {
+  total: number;
+  mastered: number;
+  ranks: { learning: number; bronze: number; silver: number; gold: number; };
+  weakWords: any[];
+  checkWords: any[];
+  recentLogs: any[];
+  graphData: any[];
+  pieData: any[];
+};
 
+// --- 定数データ ---
 export const USERS = [
   { id: 'brother', db_target: 'brother', name: 'たくま (小6)', color: 'bg-stone-800', light: 'bg-stone-50', text: 'text-stone-800' },
   { id: 'sister', db_target: 'sister', name: 'みのり (小4)', color: 'bg-stone-800', light: 'bg-stone-50', text: 'text-stone-800' },
@@ -48,16 +59,11 @@ export const USERS = [
 
 // 受験対策・分野別の教材カテゴリ
 export const CATEGORIES = [
-  // --- 新カテゴリ（これからの登録用：ランク分類を採用） ---
   { id: 'v2_rank_a', name: '【新】ランクA（最頻出）' },
   { id: 'v2_rank_b', name: '【新】ランクB（頻出）' },
   { id: 'v2_rank_c', name: '【新】ランクC（差がつく）' },
-  
-  // (必要に応じてその他の新カテゴリ)
   { id: 'v2_idiom_read', name: '【新】難読・特殊な読み' },
   { id: 'v2_vocab_relation', name: '【新】対義語・類義語・四字熟語' },
-  
-  // --- 旧カテゴリ（書庫行き） ---
   { id: 'exam_frequent', name: '【旧】中学受験 頻出漢字' },
   { id: 'idiom', name: '【旧】四字熟語・慣用句' },
   { id: 'synonym_antonym', name: '【旧】対義語・類義語' },
@@ -68,7 +74,6 @@ export const CATEGORIES = [
   { id: 'general', name: '一般・その他' },
 ];
 
-// モード定義もシンプルに
 export const MODE_NAMES: Record<string, string> = {
   daily_drill: '今日のドリル',
   notebook: '取り組みノート',
