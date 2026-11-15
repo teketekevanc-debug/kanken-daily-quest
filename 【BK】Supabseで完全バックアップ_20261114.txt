@@ -1,0 +1,6 @@
+20261114　Supabase完全バックアップ時
+#
+Kanken-daily-quest
+postgresql://postgres:o7G0mbAflqvL0RF1@db.aatwrkfviprkvjgvjqqa.supabase.co:5432/postgres
+
+プロジェクトパスワード

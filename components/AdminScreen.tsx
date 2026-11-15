@@ -1,17 +1,8 @@
+// components/AdminScreen.tsx
 'use client'
 import React, { useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Label } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { USERS, CATEGORIES, getUserFirstName } from '@/lib/constants'
-
-const getPieColor = (index: number) => {
-  const colors = ['#E5E7EB', '#CD7F32', '#C0C0C0', '#FFD700'];
-  const [c0, c1, c2, c3] = colors;
-  const mod = index % 4;
-  if (mod === 0) return c0;
-  if (mod === 1) return c1;
-  if (mod === 2) return c2;
-  return c3;
-};
 
 const BAR_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
 
@@ -23,10 +14,6 @@ type AdminScreenProps = {
   fetchAdminStats: (user: any) => void;
   fetchAllWordsForEdit: () => void;
   stats: any;
-  challengeSettings: any;
-  setChallengeSettings: (settings: any) => void;
-  saveChallengeSettings: (settings: any) => void;
-  sendLineToChild: (msg: string) => void;
   editStreak: number;
   setEditStreak: (num: number) => void;
   handleSaveStreak: () => void;
@@ -44,20 +31,20 @@ type AdminScreenProps = {
 export default function AdminScreen(props: AdminScreenProps) {
   const {
     setView, adminTargetUser, setAdminTargetUser, fetchAdminStats,
-    fetchAllWordsForEdit, stats, challengeSettings, setChallengeSettings,
-    saveChallengeSettings, sendLineToChild, editStreak, setEditStreak,
+    fetchAllWordsForEdit, stats, editStreak, setEditStreak,
     handleSaveStreak, handleAddWord, handleUpdateWord, allWordsList, toggleMasterStatus,
     handleDeleteWord, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar
   } = props;
 
-  const [adminTab, setAdminTab] = useState<'stats' | 'challenge' | 'add_word' | 'manage'>('stats');
-  const [showAllWeakWords, setShowAllWeakWords] = useState(false);
+  const [adminTab, setAdminTab] = useState<'stats' | 'add_word' | 'manage'>('stats');
   
-  const defaultCategory = CATEGORIES.find(c => c.id.includes('exam'))?.id || CATEGORIES[0]?.id || 'kyu6';
-  const [newWord, setNewWord] = useState({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: defaultCategory, stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' });
+  // 新しいカテゴリのデフォルト値を設定
+  const defaultCategory = CATEGORIES.find(c => c.id.startsWith('v2_'))?.id || CATEGORIES[0]?.id;
+  const [newWord, setNewWord] = useState({ kanji: '', reading: '', okurigana: '', usage_example: '', origin_logic: '', category: defaultCategory });
   const [isMistakeInitial, setIsMistakeInitial] = useState(false);
 
   const [manageSearchQuery, setManageSearchQuery] = useState('');
+  const [manageCategory, setManageCategory] = useState('all'); // ★追加: 管理画面用のカテゴリ絞り込み
   const [editingWord, setEditingWord] = useState<any>(null);
 
   const matchingLogs = selectedLogDate ? monthlyLogs.filter(l => l.date === selectedLogDate) : [];
@@ -65,73 +52,82 @@ export default function AdminScreen(props: AdminScreenProps) {
   const [rTopL, rTopR, rBotR, rBotL] = BAR_RADIUS;
 
   const onAddWordClick = () => {
+    if (!newWord.kanji || !newWord.reading) {
+      alert("漢字と読みは必須です。");
+      return;
+    }
     handleAddWord(newWord, isMistakeInitial); 
-    setNewWord({ kanji: '', reading: '', okurigana: '', sentence: '', emoji: '📝', category: defaultCategory, stroke_count: '', stroke_data_url: '', usage_example: '', origin_logic: '' });
+    setNewWord({ kanji: '', reading: '', okurigana: '', usage_example: '', origin_logic: '', category: defaultCategory });
     setIsMistakeInitial(false); 
   };
 
-  const filteredManageWords = allWordsList.filter(w => 
-    w.kanji.includes(manageSearchQuery) || 
-    w.reading.includes(manageSearchQuery) ||
-    (w.usage_example && w.usage_example.includes(manageSearchQuery))
-  );
+  // ★変更: カテゴリ絞り込みとテキスト検索の両方を適用
+  const filteredManageWords = allWordsList.filter(w => {
+    if (manageCategory !== 'all' && w.kanji_level !== manageCategory) return false;
+    if (manageSearchQuery && !w.kanji.includes(manageSearchQuery) && !w.reading.includes(manageSearchQuery) && !(w.usage_example && w.usage_example.includes(manageSearchQuery))) return false;
+    return true;
+  });
 
   return (
-    <div className="min-h-screen bg-stone-50 font-sans p-4 md:p-8 pb-24 text-center">
+    <div className="min-h-screen bg-stone-100 font-sans p-4 md:p-8 pb-24 text-center">
       
+      {/* ログ詳細モーダル */}
       {selectedLogDate && (
         <div className="fixed inset-0 bg-stone-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedLogDate(null)}>
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl relative" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl relative" onClick={e => e.stopPropagation()}>
             <h3 className="font-black text-xl mb-4 text-stone-800">{selectedLogDate} の記録</h3>
 
-            <div className="overflow-y-auto flex-1 mb-4 space-y-2 pr-1 custom-scrollbar">
+            <div className="overflow-y-auto flex-1 mb-4 space-y-2 pr-1 no-scrollbar">
               {selectedLog?.details?.length ? (
                 selectedLog.details.map((d: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center p-3 bg-stone-50 rounded-xl border border-stone-100">
-                    <span className="text-xs font-bold text-stone-400 w-16 text-left">{d.mode}</span>
-                    <span className="font-black text-stone-700 flex-1 text-center text-lg">{d.word}</span>
-                    <span className="text-xl w-8 text-right">{d.result === 'correct' ? '⭕' : d.result === 'done' ? '✓' : '❌'}</span>
+                  <div key={i} className="flex justify-between items-center p-3 bg-stone-50 rounded-lg border border-stone-200">
+                    <span className="font-black text-stone-700 flex-1 text-left text-lg">{d.word}</span>
+                    <span className="text-xs font-bold text-stone-400 mx-2">⏱️ {d.timeSpent || 0}秒</span>
+                    <span className="text-xl w-8 text-right">{d.result === 'correct' ? '⭕' : '❌'}</span>
                   </div>
                 ))
               ) : (
-                <p className="text-stone-400 font-bold py-4 text-center">データなし</p>
+                <p className="text-stone-400 font-bold py-4 text-center">学習データなし</p>
               )}
             </div>
 
-            <button onClick={() => setSelectedLogDate(null)} className="w-full bg-stone-800 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all">
+            <button onClick={() => setSelectedLogDate(null)} className="w-full bg-stone-800 text-white font-black py-4 rounded-xl shadow-sm active:scale-95 transition-all">
               閉じる
             </button>
           </div>
         </div>
       )}
 
+      {/* 編集モーダル */}
       {editingWord && (
         <div className="fixed inset-0 bg-stone-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setEditingWord(null)}>
-          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-2xl relative text-left" onClick={e => e.stopPropagation()}>
-            <h3 className="font-black text-indigo-700 mb-6 text-xl">📝 言葉の編集</h3>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto shadow-2xl relative text-left" onClick={e => e.stopPropagation()}>
+            <h3 className="font-black text-stone-700 mb-4 text-lg">📝 言葉の編集</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <input className="border-2 border-stone-200 p-4 rounded-2xl font-black text-2xl outline-none focus:border-indigo-400 bg-stone-50" placeholder="漢字" value={editingWord.kanji} onChange={e => setEditingWord({...editingWord, kanji: e.target.value})} />
-                <input className="border-2 border-stone-200 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50" placeholder="読み" value={editingWord.reading} onChange={e => setEditingWord({...editingWord, reading: e.target.value})} />
+                <input className="border border-stone-300 p-3 rounded-lg font-black text-xl outline-none focus:border-stone-500 bg-white text-stone-800" placeholder="漢字" value={editingWord.kanji} onChange={e => setEditingWord({...editingWord, kanji: e.target.value})} />
+                <input className="border border-stone-300 p-3 rounded-lg font-bold outline-none focus:border-stone-500 bg-white text-stone-800" placeholder="読み" value={editingWord.reading} onChange={e => setEditingWord({...editingWord, reading: e.target.value})} />
               </div>
-              <select className="w-full border-2 border-stone-200 p-4 rounded-2xl font-bold bg-stone-50 outline-none focus:border-indigo-400" value={editingWord.kanji_level} onChange={e => setEditingWord({...editingWord, kanji_level: e.target.value})}>
-                {CATEGORIES.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <select className="w-full border border-stone-300 p-3 rounded-lg font-bold bg-white outline-none focus:border-stone-500 text-stone-800" value={editingWord.kanji_level} onChange={e => setEditingWord({...editingWord, kanji_level: e.target.value})}>
+                {CATEGORIES.map((c: any) => <option key={c.id} value={c.id} className="text-stone-800">{c.name}</option>)}
               </select>
-              <textarea className="w-full border-2 border-stone-200 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 min-h-[100px]" placeholder="例文" value={editingWord.usage_example || ''} onChange={e => setEditingWord({...editingWord, usage_example: e.target.value})} />
+              <textarea className="w-full border border-stone-300 p-3 rounded-lg font-bold outline-none focus:border-stone-500 bg-white min-h-[80px] text-stone-800" placeholder="例文（任意）" value={editingWord.usage_example || ''} onChange={e => setEditingWord({...editingWord, usage_example: e.target.value})} />
+              <textarea className="w-full border border-stone-300 p-3 rounded-lg font-bold outline-none focus:border-stone-500 bg-white min-h-[80px] text-stone-800" placeholder="なりたち・解説（任意）" value={editingWord.origin_logic || ''} onChange={e => setEditingWord({...editingWord, origin_logic: e.target.value})} />
               
               <div className="flex gap-2 mt-4">
-                <button onClick={() => setEditingWord(null)} className="flex-1 bg-stone-200 text-stone-600 py-4 rounded-2xl font-black shadow-sm">キャンセル</button>
+                <button onClick={() => setEditingWord(null)} className="flex-1 bg-stone-100 text-stone-600 py-3 rounded-lg font-black shadow-sm border border-stone-200">キャンセル</button>
                 <button 
                   onClick={() => {
                     handleUpdateWord(editingWord.id, {
                       kanji: editingWord.kanji,
                       reading: editingWord.reading,
                       kanji_level: editingWord.kanji_level,
-                      usage_example: editingWord.usage_example
+                      usage_example: editingWord.usage_example,
+                      origin_logic: editingWord.origin_logic
                     });
                     setEditingWord(null);
                   }} 
-                  className="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-xl"
+                  className="flex-1 bg-stone-800 text-white py-3 rounded-lg font-black shadow-sm"
                 >
                   保存する
                 </button>
@@ -143,271 +139,198 @@ export default function AdminScreen(props: AdminScreenProps) {
 
       <div className="max-w-2xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <button onClick={() => setView('menu')} className="text-stone-500 font-bold bg-white px-6 py-2 rounded-full shadow-sm hover:bg-stone-50 transition">← もどる</button>
-          <h2 className="text-2xl font-black text-stone-700">保護者メニュー</h2>
+          <button onClick={() => setView('menu')} className="text-stone-600 font-bold bg-white px-5 py-2 rounded-md shadow-sm border border-stone-200 hover:bg-stone-50 transition active:scale-95">← メニューへ</button>
+          <h2 className="text-xl font-black text-stone-800">保護者管理</h2>
         </div>
 
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
+        <div className="flex flex-wrap justify-center gap-2 mb-6">
           {USERS.map((u: any) => (
-            <button key={u.id} onClick={() => { setAdminTargetUser(u); fetchAdminStats(u); }} className={`px-5 py-2.5 rounded-full text-sm font-black transition-all shadow-sm ${adminTargetUser.id === u.id ? `bg-gradient-to-r ${u.hue} text-white scale-105 shadow-md` : 'bg-white text-stone-400 hover:bg-stone-50'}`}>
+            <button key={u.id} onClick={() => { setAdminTargetUser(u); fetchAdminStats(u); }} className={`px-4 py-2 rounded-md text-sm font-black transition-all shadow-sm border ${adminTargetUser.id === u.id ? 'bg-stone-800 text-white border-stone-900' : 'bg-white text-stone-400 border-stone-200 hover:bg-stone-50'}`}>
               {u.name}
             </button>
           ))}
         </div>
 
-        <div className="bg-white rounded-2xl p-2 mb-8 shadow-md flex border-2 border-stone-200">
-          <button onClick={() => setAdminTab('stats')} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${adminTab === 'stats' ? 'bg-orange-100 text-orange-700 shadow-inner' : 'text-stone-400'}`}>📊 成績</button>
-          <button onClick={() => { setAdminTab('challenge'); fetchAllWordsForEdit(); }} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${adminTab === 'challenge' ? 'bg-rose-100 text-rose-700 shadow-inner' : 'text-stone-400'}`}>⚔️ 挑戦状</button>
-          <button onClick={() => setAdminTab('add_word')} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${adminTab === 'add_word' ? 'bg-indigo-100 text-indigo-700 shadow-inner' : 'text-stone-400'}`}>➕ 追加</button>
-          <button onClick={() => { setAdminTab('manage'); fetchAllWordsForEdit(); }} className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${adminTab === 'manage' ? 'bg-slate-100 text-slate-700 shadow-inner' : 'text-stone-400'}`}>📝 編集</button>
+        <div className="bg-white rounded-lg p-1.5 mb-6 shadow-sm flex border border-stone-200">
+          <button onClick={() => setAdminTab('stats')} className={`flex-1 py-2 text-sm font-black rounded-md transition-all ${adminTab === 'stats' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:bg-stone-50'}`}>📊 成績・記録</button>
+          <button onClick={() => setAdminTab('add_word')} className={`flex-1 py-2 text-sm font-black rounded-md transition-all ${adminTab === 'add_word' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:bg-stone-50'}`}>➕ 単語の追加</button>
+          <button onClick={() => { setAdminTab('manage'); fetchAllWordsForEdit(); }} className={`flex-1 py-2 text-sm font-black rounded-md transition-all ${adminTab === 'manage' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:bg-stone-50'}`}>📝 編集・削除</button>
         </div>
 
         <div className="space-y-6">
           {adminTab === 'stats' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-orange-50 p-6 rounded-[2rem] border-2 border-orange-100 shadow-sm md:col-span-2 text-left">
-                  <h3 className="font-black text-orange-700 mb-2 flex items-center gap-2">🕒 今日の学習状況</h3>
-                  <div className="flex items-end justify-between">
+                
+                {/* 学習サマリー */}
+                <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm text-left">
+                  <h3 className="font-black text-stone-700 mb-2 border-b border-stone-100 pb-2">🕒 今日の学習状況</h3>
+                  <div className="flex items-end justify-between mt-4">
                     <div>
+                      <p className="text-[10px] font-bold text-stone-400 mb-1">学習時間</p>
                       {(() => {
                         const todayStr = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
                         const matching = (stats?.recentLogs || []).filter((l: any) => l.date === todayStr);
-                        const [todayLog] = matching;
-                        const studySeconds = todayLog?.study_time_seconds || 0;
-
-                        return (
-                          <>
-                            <p className="text-3xl font-black text-orange-600">
-                              {Math.floor(studySeconds / 60)} <span className="text-sm">分</span> {studySeconds % 60} <span className="text-sm">秒</span>
-                            </p>
-                          </>
-                        );
+                        const studySeconds = matching[0]?.study_time_seconds || 0;
+                        return <p className="text-2xl font-black text-stone-800">{Math.floor(studySeconds / 60)} <span className="text-xs">分</span></p>;
                       })()}
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] font-black text-stone-400">今日の正解数</p>
+                      <p className="text-[10px] font-bold text-stone-400 mb-1">ドリル進捗</p>
                       {(() => {
-                        const [latestLog] = stats?.recentLogs || [];
-                        const tParts = new Date().toISOString().split('T');
-                        const [todayIso] = tParts;
-                        const isToday = latestLog?.date === todayIso;
-                        return <p className="text-xl font-black text-stone-700">{isToday ? latestLog.count : 0} 問</p>;
+                        const todayStr = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+                        const matching = (stats?.recentLogs || []).filter((l: any) => l.date === todayStr);
+                        return <p className="text-xl font-black text-stone-700">{matching[0]?.count || 0} 問</p>;
                       })()}
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 flex flex-col">
-                  <h3 className="font-black text-stone-700 mb-2 flex items-center gap-2">📈 習得率</h3>
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="w-1/2 h-40">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={stats?.pieData || []} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" stroke="none">
-                            {(stats?.pieData || []).map((e: any, i: number) => <Cell key={i} fill={getPieColor(i)} />)}
-                            <Label value={`${Math.round(((stats?.mastered || 0) / (stats?.total || 1)) * 100) || 0}%`} position="center" className="font-black text-xl text-stone-700" />
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="w-1/2 flex flex-col gap-2 text-xs font-bold text-stone-500 ml-2">
-                      {(stats?.pieData || []).map((entry: any, index: number) => (
-                        <div key={index} className="flex items-center gap-2 text-left">
-                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getPieColor(index) }}></div>
-                          <span className="truncate">{entry.name} ({entry.value})</span>
+                {/* 苦手ワースト */}
+                <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm text-left flex flex-col">
+                  <h3 className="font-black text-rose-700 mb-3 border-b border-stone-100 pb-2">🔥 苦手ワースト（全体）</h3>
+                  <ul className="space-y-2 overflow-y-auto flex-1 pr-1 no-scrollbar max-h-32">
+                    {(stats?.weakWords || []).slice(0, 5).map((w: any, i: number) => (
+                      <li key={i} className="flex justify-between items-center text-sm border-b border-stone-50 pb-1">
+                        <div className="font-bold text-stone-700 truncate mr-2 flex-1">
+                          {w.word} <span className="text-[10px] text-stone-400 font-normal">({w.meaning})</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 flex flex-col">
-                  <h3 className="font-black text-stone-700 mb-4 flex items-center gap-2">🔥 苦手ワースト</h3>
-                  <ul className="space-y-3 overflow-y-auto flex-1 pr-2 no-scrollbar max-h-40">
-                    {(stats?.weakWords || []).slice(0, showAllWeakWords ? undefined : 5).map((w: any, i: number) => (
-                      <li key={i} className="flex justify-between items-center text-sm border-b border-stone-100 pb-2 text-left">
-                        <div className="font-bold text-stone-800 truncate mr-2 flex-1">
-                          {i+1}. {w.word} <span className="text-[10px] text-stone-400 font-normal">({w.meaning})</span>
-                        </div>
-                        <span className="bg-rose-50 text-rose-500 px-2 py-1 rounded-lg text-xs font-black shrink-0">{w.mistakes}回</span>
+                        <span className="bg-rose-50 text-rose-600 px-2 py-0.5 rounded text-xs font-black shrink-0">{w.mistakes}回</span>
                       </li>
                     ))}
+                    {(stats?.weakWords?.length === 0) && <li className="text-stone-400 text-xs font-bold">該当なし</li>}
                   </ul>
-                  {(stats?.weakWords?.length || 0) > 5 && (
-                     <button onClick={() => setShowAllWeakWords(!showAllWeakWords)} className="mt-3 text-xs font-bold text-sky-500 bg-sky-50 hover:bg-sky-100 active:scale-95 transition-all py-2 rounded-xl w-full">
-                       {showAllWeakWords ? '▲ 閉じる' : 'もっと見る ▼'}
-                     </button>
-                  )}
                 </div>
               </div> 
 
-              <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 text-left">
-                 <h3 className="font-black text-stone-700 mb-4 flex items-center gap-2">📊 30日間の学習推移 ({getUserFirstName(adminTargetUser.name)})</h3>
-                 <div className="h-64 w-full">
+              {/* グラフ */}
+              <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm text-left">
+                 <h3 className="font-black text-stone-700 mb-4">📊 30日間の学習回数推移</h3>
+                 <div className="h-48 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={stats?.graphData || []}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                         <XAxis dataKey="date" tick={{fontSize: 10, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
                         <YAxis tick={{fontSize: 10, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
-                        <Tooltip contentStyle={{borderRadius: '15px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
-                        <Bar dataKey="count" fill={adminTargetUser.id === 'sister' ? '#0ea5e9' : adminTargetUser.id === 'mami' ? '#ec4899' : adminTargetUser.id === 'kenta' ? '#10b981' : '#f59e0b'} radius={[rTopL, rTopR, rBotR, rBotL]} />
+                        <Tooltip cursor={{fill: '#f5f5f4'}} contentStyle={{borderRadius: '8px', border: '1px solid #e7e5e4', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                        <Bar dataKey="count" fill="#44403c" radius={[rTopL, rTopR, rBotR, rBotL]} />
                       </BarChart>
                     </ResponsiveContainer>
                  </div>
               </div>
 
-              {renderCalendar()}
-            </div>
-          )}
-
-          {adminTab === 'challenge' && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 text-left">
-              <div className="bg-emerald-50/50 p-6 rounded-[2rem] border-2 border-emerald-100 shadow-sm">
-                <h3 className="font-black text-emerald-700 flex items-center gap-2 mb-4">🎯 出題数の設定</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs font-black text-emerald-500 block mb-1 ml-2">毎日の冒険</label>
-                    <input type="number" className="w-full p-4 rounded-2xl border-2 border-emerald-100 outline-none focus:border-emerald-300 font-bold bg-white" value={challengeSettings.quest_count} onChange={e => setChallengeSettings({...challengeSettings, quest_count: parseInt(e.target.value) || 0})} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-black text-emerald-500 block mb-1 ml-2">週末ボス</label>
-                    <input type="number" className="w-full p-4 rounded-2xl border-2 border-emerald-100 outline-none focus:border-emerald-300 font-bold bg-white" value={challengeSettings.special_quest_count} onChange={e => setChallengeSettings({...challengeSettings, special_quest_count: parseInt(e.target.value) || 0})} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-black text-emerald-500 block mb-1 ml-2">パパ / Rick挑戦</label>
-                    <input type="number" className="w-full p-4 rounded-2xl border-2 border-emerald-100 outline-none focus:border-emerald-300 font-bold bg-white" value={challengeSettings.challenge_quest_count} onChange={e => setChallengeSettings({...challengeSettings, challenge_quest_count: parseInt(e.target.value) || 0})} />
-                  </div>
-                </div>
+              {/* カレンダー */}
+              <div className="mt-4">
+                {renderCalendar()}
               </div>
 
-              <div className="bg-amber-50/50 p-6 rounded-[2rem] border-2 border-amber-100 shadow-sm">
-                <h3 className="font-black text-amber-700 mb-4">パパからの挑戦状設定</h3>
-                <div className="flex gap-6 mb-6 ml-2">
-                  <label className="flex items-center gap-2 font-bold text-sm cursor-pointer group">
-                    <input type="radio" checked={challengeSettings.mode === 'manual'} onChange={() => setChallengeSettings({...challengeSettings, mode: 'manual'})} className="w-5 h-5 accent-amber-600" /> <span>手動で選ぶ</span>
-                  </label>
-                  <label className="flex items-center gap-2 font-bold text-sm cursor-pointer group">
-                    <input type="radio" checked={challengeSettings.mode === 'auto'} onChange={() => setChallengeSettings({...challengeSettings, mode: 'auto'})} className="w-5 h-5 accent-amber-600" /> <span>苦手から自動</span>
-                  </label>
-                </div>
-                <div className="bg-white p-4 rounded-2xl border-2 border-amber-100 mb-6">
-                  <p className="text-[10px] font-black text-amber-400 mb-1 ml-1">自動選択の問題数</p>
-                  <select className="w-full p-2 bg-transparent outline-none font-bold text-stone-700" value={challengeSettings.auto_count} onChange={e => setChallengeSettings({...challengeSettings, auto_count: parseInt(e.target.value) || 0})}>
-                    <option value="3">ワースト 3問</option>
-                    <option value="5">ワースト 5問</option>
-                    <option value="10">ワースト 10問</option>
-                    <option value="15">ワースト 15問</option>
-                  </select>
-                </div>
+              {/* データ手動修正 */}
+              <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 mt-4 text-left flex items-center justify-between">
+                <span className="text-xs font-bold text-stone-500">連続記録の手動修正:</span>
                 <div className="flex gap-2">
-                  <button onClick={() => saveChallengeSettings(challengeSettings)} className="flex-1 bg-rose-500 text-white font-black py-5 rounded-2xl shadow-xl active:scale-95 transition-all tracking-widest text-lg">すべての設定を保存</button>
-                  <button onClick={() => sendLineToChild(`【${adminTargetUser.name}】パパから新しい挑戦状が届いたよ！🔥`)} className="bg-emerald-500 text-white font-black px-6 py-5 rounded-2xl shadow-xl active:scale-95 transition-all text-xs flex flex-col items-center justify-center gap-1"><span>LINE通知</span></button>
+                  <input type="number" className="w-16 p-1 text-center border border-stone-300 rounded font-bold text-stone-800" value={editStreak} onChange={e => setEditStreak(parseInt(e.target.value) || 0)} />
+                  <button onClick={handleSaveStreak} className="bg-stone-300 text-stone-700 text-xs font-bold px-3 py-1 rounded active:scale-95">保存</button>
                 </div>
               </div>
 
-              <div className="bg-[#1a1a1a] p-6 rounded-[2rem] shadow-2xl space-y-5 border border-white/5 text-left mt-8">
-                <div className="space-y-1">
-                  <h3 className="text-md font-black text-white flex items-center gap-2">🚑 救済措置（データの直接修正）</h3>
-                  <p className="text-[9px] text-stone-500 font-bold ml-1">記録を直したい時に使ってください。</p>
-                </div>
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="bg-white/5 p-4 rounded-[1.25rem] border border-white/5">
-                    <label className="text-[10px] font-black text-stone-400 block mb-2 ml-1">現在の連続日数</label>
-                    <div className="flex gap-2 items-center bg-black/40 p-1.5 rounded-xl border border-white/5">
-                      <input type="number" className="flex-1 bg-transparent border-none text-white font-black text-xl px-3 outline-none" value={editStreak} onChange={e => setEditStreak(parseInt(e.target.value) || 0)} />
-                      <button onClick={handleSaveStreak} className="bg-[#f97316] text-white text-[10px] font-black py-2 px-4 rounded-lg shadow-lg active:scale-95 transition-all">保存</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
           {adminTab === 'add_word' && (
-            <div className="bg-white p-8 rounded-[2.5rem] shadow-md border-2 border-stone-100 text-left">
-              <h3 className="font-black text-indigo-700 mb-6 text-xl">➕ 新しい言葉の登録</h3>
-              <div className="space-y-5">
+            <div className="bg-white p-6 rounded-xl border border-stone-200 shadow-sm text-left animate-in fade-in slide-in-from-bottom-2">
+              <h3 className="font-black text-stone-700 mb-4 border-b border-stone-100 pb-2">➕ 新しい漢字・熟語の登録</h3>
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <input className="border-2 border-stone-100 p-4 rounded-2xl font-black text-2xl outline-none focus:border-indigo-400 bg-stone-50 shadow-inner" placeholder="漢字" value={newWord.kanji} onChange={e => setNewWord({...newWord, kanji: e.target.value})} />
-                  <input className="border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner" placeholder="読み" value={newWord.reading} onChange={e => setNewWord({...newWord, reading: e.target.value})} />
+                  <input className="border border-stone-300 p-3 rounded-lg font-black text-xl outline-none focus:border-stone-500 bg-white text-stone-800" placeholder="漢字（必須）" value={newWord.kanji} onChange={e => setNewWord({...newWord, kanji: e.target.value})} />
+                  <input className="border border-stone-300 p-3 rounded-lg font-bold outline-none focus:border-stone-500 bg-white text-stone-800" placeholder="読み（必須）" value={newWord.reading} onChange={e => setNewWord({...newWord, reading: e.target.value})} />
                 </div>
-                <select className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold bg-stone-50 outline-none focus:border-indigo-400" value={newWord.category} onChange={e => setNewWord({...newWord, category: e.target.value})}>
-                  {CATEGORIES.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <textarea className="w-full border-2 border-stone-100 p-4 rounded-2xl font-bold outline-none focus:border-indigo-400 bg-stone-50 shadow-inner min-h-[120px]" placeholder="例文" value={newWord.usage_example} onChange={e => setNewWord({...newWord, usage_example: e.target.value})} />
                 
-                <label className="flex items-center gap-2 font-bold text-stone-600 bg-stone-50 p-4 rounded-2xl border-2 border-stone-100 cursor-pointer">
+                <p className="text-xs font-bold text-stone-500 mt-2 mb-1">カテゴリ（【新】の分類を選んでください）</p>
+                <select className="w-full border border-stone-300 p-3 rounded-lg font-bold bg-white outline-none focus:border-stone-500 text-stone-800 appearance-none" value={newWord.category} onChange={e => setNewWord({...newWord, category: e.target.value})}>
+                  {CATEGORIES.map((c: any) => <option key={c.id} value={c.id} className="text-stone-800">{c.name}</option>)}
+                </select>
+                
+                <textarea className="w-full border border-stone-300 p-3 rounded-lg font-bold outline-none focus:border-stone-500 bg-white min-h-[80px] text-stone-800" placeholder="例文（任意）" value={newWord.usage_example} onChange={e => setNewWord({...newWord, usage_example: e.target.value})} />
+                <textarea className="w-full border border-stone-300 p-3 rounded-lg font-bold outline-none focus:border-stone-500 bg-white min-h-[80px] text-stone-800" placeholder="なりたち・解説（任意）" value={newWord.origin_logic} onChange={e => setNewWord({...newWord, origin_logic: e.target.value})} />
+                
+                <label className="flex items-center gap-2 font-bold text-stone-600 bg-stone-50 p-3 rounded-lg border border-stone-200 cursor-pointer">
                   <input 
                     type="checkbox" 
                     checked={isMistakeInitial} 
                     onChange={e => setIsMistakeInitial(e.target.checked)} 
-                    className="w-5 h-5 accent-indigo-600"
+                    className="w-4 h-4 accent-stone-800"
                   />
-                  <span className="text-sm">🔥 最初から「間違えた漢字（要復習）」にする</span>
+                  <span className="text-sm">🔥 登録と同時に「1回ミス扱い」にして復習に出やすくする</span>
                 </label>
 
-                <button onClick={onAddWordClick} className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition hover:bg-indigo-700">追加する 🐾</button>
+                <button onClick={onAddWordClick} className="w-full bg-stone-800 text-white py-4 rounded-lg font-black text-lg shadow-sm active:scale-95 transition hover:bg-stone-700">登録する</button>
               </div>
             </div>
           )}
 
           {adminTab === 'manage' && (
-            <div className="bg-white p-6 rounded-[2rem] shadow-md border-2 border-stone-100 text-left">
-              <div className="flex flex-col gap-4 mb-6">
-                <div className="flex items-center justify-between px-2">
-                  <h3 className="font-black text-slate-700 text-xl flex items-center gap-2">📝 編集・削除</h3>
-                  <span className="text-[10px] font-black text-stone-400 bg-stone-100 px-3 py-1 rounded-full">全 {allWordsList.length} 件</span>
+            <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm text-left animate-in fade-in slide-in-from-bottom-2">
+              <div className="flex flex-col gap-3 mb-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-black text-stone-700 border-b border-stone-100 pb-2 flex-1">📝 登録データ管理</h3>
+                  <span className="text-xs font-bold text-stone-400 bg-stone-100 px-2 py-1 rounded">全 {allWordsList.length} 件</span>
                 </div>
-                <input 
-                  type="text" 
-                  placeholder="漢字・読み・例文で検索..." 
-                  value={manageSearchQuery}
-                  onChange={(e) => setManageSearchQuery(e.target.value)}
-                  className="w-full border-2 border-stone-200 rounded-xl p-3 font-bold bg-stone-50 outline-none focus:border-sky-400"
-                />
+                
+                {/* ★ 変更: カテゴリ絞り込み用のセレクトボックスを追加 */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <select 
+                    value={manageCategory} 
+                    onChange={e => setManageCategory(e.target.value)} 
+                    className="w-full sm:w-1/3 border border-stone-300 rounded-lg p-2.5 font-bold bg-white outline-none focus:border-stone-500 text-sm text-stone-800 appearance-none"
+                  >
+                    <option value="all" className="text-stone-800">すべてのカテゴリ</option>
+                    {CATEGORIES.map((c: any) => <option key={c.id} value={c.id} className="text-stone-800">{c.name}</option>)}
+                  </select>
+                  
+                  <input 
+                    type="text" 
+                    placeholder="漢字・読み・例文で検索..." 
+                    value={manageSearchQuery}
+                    onChange={(e) => setManageSearchQuery(e.target.value)}
+                    className="w-full sm:w-2/3 border border-stone-300 rounded-lg p-2.5 font-bold bg-white outline-none focus:border-stone-500 text-sm text-stone-800"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 no-scrollbar">
+              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1 no-scrollbar">
                 {filteredManageWords.length > 0 ? filteredManageWords.map((w: any) => {
                   const category = CATEGORIES.find((c: any) => c.id === w.kanji_level);
-                  const nParts = category?.name?.split('(') || [];
-                  const [shortName] = nParts;
-                  const displayName = shortName || w.kanji_level;
+                  const displayName = category?.name?.replace('【新】', '').replace('【旧】', '') || w.kanji_level;
+                  
                   return (
-                    <div key={w.id} className="bg-stone-50/50 rounded-2xl p-4 border-2 border-stone-50 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 group hover:border-sky-100 transition-all">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="text-3xl grayscale group-hover:grayscale-0 transition-all drop-shadow-sm">{w.emoji || '📝'}</div>
-                        
+                    <div key={w.id} className="bg-stone-50 rounded-lg p-3 border border-stone-200 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1">
                         <div className="flex-1 min-w-0 text-left">
-                           <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                              <span className={`font-black text-lg truncate ${w.currentStatus === 'archived' ? 'text-stone-400 line-through' : 'text-sky-700'}`}>{w.kanji}</span>
-                              <span className="text-[9px] px-2 py-0.5 bg-white border border-stone-100 rounded-lg font-black text-stone-400 uppercase tracking-tighter">{displayName}</span>
+                           <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className={`font-black text-lg ${w.currentStatus === 'archived' ? 'text-stone-400 line-through' : 'text-stone-800'}`}>{w.kanji}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 bg-white border border-stone-200 rounded text-stone-500 font-bold">{displayName}</span>
                               {w.currentStatus === 'archived' && (
-                                <span className="text-[9px] px-2 py-0.5 bg-stone-700 text-stone-100 rounded-lg font-black shadow-sm">📦 アーカイブ</span>
+                                <span className="text-[9px] px-1.5 py-0.5 bg-stone-300 text-stone-700 rounded font-bold">📦 アーカイブ</span>
                               )}
                               {w.mistakeCount > 0 && (
-                                <span className="text-[9px] px-2 py-0.5 bg-rose-100 text-rose-600 rounded-lg font-black shadow-sm">🔥 ミス: {w.mistakeCount}回</span>
+                                <span className="text-[9px] px-1.5 py-0.5 bg-rose-100 text-rose-600 rounded font-black">🔥 ミス {w.mistakeCount}回</span>
                               )}
                            </div>
                            <p className="text-xs font-bold text-stone-500 truncate">{w.reading}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-end gap-2 mt-2 sm:mt-0">
-                         <button onClick={() => toggleMasterStatus(w.id, w.currentStatus)} className={`px-4 py-2 rounded-xl text-[10px] font-black shadow-sm transition-all border-b-2 active:translate-y-0.5 active:border-b-0 ${w.currentStatus === 'gold' ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-white text-stone-300 border-stone-100'}`}>
-                           {w.currentStatus === 'gold' ? '👑 解除' : '👑 習得'}
+                      <div className="flex items-center justify-end gap-2">
+                         <button onClick={() => toggleMasterStatus(w.id, w.currentStatus)} className={`px-3 py-1.5 rounded-md text-[10px] font-black transition-all border ${w.currentStatus === 'gold' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-white text-stone-400 border-stone-200 hover:bg-stone-100'}`}>
+                           {w.currentStatus === 'gold' ? '解除' : '習得済にする'}
                          </button>
-                         <button onClick={() => setEditingWord(w)} className="bg-white text-indigo-500 p-2 rounded-xl border border-indigo-50 hover:bg-indigo-50 transition-all shadow-sm font-bold text-xs">編集</button>
-                         <button onClick={() => handleDeleteWord(w.id)} className="bg-white text-rose-400 p-2 rounded-xl border border-rose-50 hover:bg-rose-100 hover:text-rose-500 transition-all shadow-sm font-bold text-xs">削除</button>
+                         <button onClick={() => setEditingWord(w)} className="bg-white text-stone-600 px-3 py-1.5 rounded-md border border-stone-200 hover:bg-stone-100 transition-all font-bold text-[10px]">編集</button>
+                         <button onClick={() => handleDeleteWord(w.id)} className="bg-white text-rose-500 px-3 py-1.5 rounded-md border border-rose-200 hover:bg-rose-50 transition-all font-bold text-[10px]">削除</button>
                       </div>
                     </div>
                   )
                 }) : (
-                  <div className="text-center py-10 text-stone-400 font-bold">
-                    <p className="text-3xl mb-2">🔎</p>
-                    見つかりませんでした
-                  </div>
+                  <div className="text-center py-10 text-stone-400 font-bold text-sm">見つかりませんでした</div>
                 )}
               </div>
             </div>

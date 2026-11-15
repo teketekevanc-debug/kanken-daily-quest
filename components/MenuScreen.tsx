@@ -1,534 +1,173 @@
+// components/MenuScreen.tsx
 'use client'
-import React, { useState } from 'react'
-import { supabase } from "@/lib/supabaseClient"
-import { USERS, CATEGORIES, MODE_NAMES, getUserFirstName, getDailyMessage } from '@/lib/constants'
-import type { ExamMissionPhase } from '@/lib/constants'
+import React from 'react'
+import { USERS, getUserFirstName } from '@/lib/constants'
 
 type MenuScreenProps = {
   currentUser: any;
   setCurrentUser: (user: any) => void;
   dailyProgress: any;
-  challengeSettings: any;
-  targetKyu: string;
-  setTargetKyu: (kyu: string) => void;
-  selectedInputMode: string;
-  setSelectedInputMode: (mode: any) => void;
-  rickMode: string;
-  setRickMode: (mode: any) => void;
-  reviewCandidates: any[];
-  reviewRevealed: number[];
-  toggleReviewReveal: (id: number) => void;
-  hasParentChallenge: boolean;
   startGame: (mode: string) => void;
   setView: (view: any) => void;
-  fetchCollection: () => void;
   renderCalendar: () => React.ReactNode;
   stopSpeaking: () => void;
   fetchAdminStats: (user: any) => void;
   setAdminTargetUser: (user: any) => void;
-  renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
-  examMission: ExamMissionPhase;
-  openChestRoom: () => void;
 }
 
 export default function MenuScreen(props: MenuScreenProps) {
   const { 
-    currentUser, setCurrentUser, dailyProgress, challengeSettings, 
-    targetKyu, setTargetKyu, selectedInputMode, setSelectedInputMode,
-    rickMode, setRickMode, reviewCandidates, reviewRevealed, toggleReviewReveal,
-    hasParentChallenge, startGame, setView, fetchCollection, renderCalendar,
-    stopSpeaking, fetchAdminStats, setAdminTargetUser, renderReading, examMission, openChestRoom
+    currentUser, setCurrentUser, dailyProgress, 
+    startGame, setView, renderCalendar,
+    stopSpeaking, fetchAdminStats, setAdminTargetUser
   } = props;
 
-  const [showTipsModal, setShowTipsModal] = useState(false);
-  const [tipSearchQuery, setTipSearchQuery] = useState('');
-  const [tipsTab, setTipsTab] = useState<'all' | 'minecraft' | 'splatoon'>('all');
+  // 今日の学習データ
+  const todaySeconds = dailyProgress?.study_time_seconds || 0;
+  const todayMinutes = Math.floor(todaySeconds / 60);
+  const completedCount = dailyProgress?.count || 0;
   
-  const [showKanjiList, setShowKanjiList] = useState(false);
-  const [kanjiList, setKanjiList] = useState<any[]>([]);
-  const [isLoadingList, setIsLoadingList] = useState(false);
-  const [listTab, setListTab] = useState<'learning' | 'mistakes' | 'mastered'>('learning');
+  // 1セット10問として、何周クリアしたかを計算
+  const setGoal = 10;
+  const completedSets = Math.floor(completedCount / setGoal);
+  const currentSetProgress = completedCount % setGoal;
+  const isCompletedOnce = completedSets > 0;
 
-  const openKanjiList = async () => {
-    setShowKanjiList(true);
-    setIsLoadingList(true);
-    setListTab('learning');
-
-    let query = supabase.from('kanji_questions').select('*').eq('target_user', currentUser.db_target).limit(3000);
-    query = query.order('id', { ascending: true }); 
-    
-    const { data: words } = await query;
-    const { data: progress } = await supabase.from('user_progress').select('question_id, status, mistake_count').eq('user_id', currentUser.id).limit(3000);
-
-    if (words) {
-      const pMap = new Map();
-      const mMap = new Map();
-      progress?.forEach(p => { 
-          pMap.set(p.question_id, p.status); 
-          mMap.set(p.question_id, p.mistake_count || 0); 
-      });
-      const merged = words.map(w => ({ 
-          ...w, 
-          currentStatus: pMap.get(w.id) || 'learning',
-          mistakeCount: mMap.get(w.id) || 0
-      }));
-      setKanjiList(merged);
-    }
-    setIsLoadingList(false);
-  };
-
-  const handleToggleRemembered = async (word: any) => {
-    const isMastered = word.currentStatus === 'gold';
-    const newStatus = isMastered ? 'learning' : 'gold';
-    setKanjiList(prev => prev.map(w => w.id === word.id ? { ...w, currentStatus: newStatus } : w));
-    if (isMastered) {
-      await supabase.from('user_progress').delete().eq('user_id', currentUser.id).eq('question_id', word.id);
-    } else {
-      await supabase.from('user_progress').upsert({
-        user_id: currentUser.id, question_id: word.id, status: 'gold', last_reviewed_at: new Date().toISOString()
-      }, { onConflict: 'user_id, question_id' });
-    }
-  };
-
-  const unlockedTips = challengeSettings?.unlocked_tips || [];
-  
-  const parseTip = (tip: string) => {
-    if (tip.startsWith('[マイクラ] ')) return { type: 'minecraft', text: tip.replace('[マイクラ] ', '') };
-    if (tip.startsWith('[スプラ] ')) return { type: 'splatoon', text: tip.replace('[スプラ] ', '') };
-    
-    // ★ 過去データ（プレフィックスなし）の自動判定
-    if (tip.includes('/') || tip.includes('@') || tip.includes('コマンド') || tip.includes('ブロック') || tip.includes('エンティティ')) {
-        return { type: 'minecraft', text: tip };
-    }
-    if (tip.includes('ブキ') || tip.includes('インク') || tip.includes('ギア') || tip.includes('スペシャル') || tip.includes('イカ')) {
-        return { type: 'splatoon', text: tip };
-    }
-    
-    return { type: 'other', text: tip }; 
-  };
-
-  const filteredUnlockedTips = unlockedTips
-    .map((tip: string, index: number) => ({ tip, index, parsed: parseTip(tip) }))
-    .filter((item: any) => {
-       // ★ 厳密なフィルタリング
-       if (tipsTab === 'minecraft' && item.parsed.type !== 'minecraft') return false;
-       if (tipsTab === 'splatoon' && item.parsed.type !== 'splatoon') return false;
-       if (!item.parsed.text.toLocaleLowerCase().includes(tipSearchQuery.trim().toLocaleLowerCase())) return false;
-       return true;
-    })
-    .sort((a: any, b: any) => {
-       // ★ ジャンルでソート（マイクラ -> スプラ -> その他）
-       if (a.parsed.type < b.parsed.type) return -1;
-       if (a.parsed.type > b.parsed.type) return 1;
-       return a.index - b.index; // 同じジャンルなら古い順
-    });
-
-  const isRickDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['rick_challenge'] && d.result === 'done'); 
-  const isParentDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['parent_challenge'] && d.result === 'done'); 
-  const isWeekendDone = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['weekend'] && d.result === 'done'); 
-  const displayCount = challengeSettings?.quest_count || 5;
-
-  const tS = dailyProgress?.study_time_seconds || 0;
-  const is10MinDone = tS >= 600;
-  const isMission100Done = dailyProgress?.details?.some((d: any) => d.mode === MODE_NAMES['mission_100'] && d.result === 'done');
-  const hasOpenedChest = dailyProgress?.details?.some((d: any) => d.mode === 'chest' && d.result === 'done');
-  const canOpenChest = is10MinDone && isMission100Done && !hasOpenedChest;
-
+  // 試験日（2027年2月1日）までのカウントダウン計算
   const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
   const today = getJSTDate();
   today.setHours(0, 0, 0, 0);
   const examDayUtc = Date.UTC(2027, 1, 1);
-  const diffDays = Math.ceil((examDayUtc - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / (1000 * 60 * 60 * 24));
+  const diffDays = Math.max(0, Math.ceil((examDayUtc - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / (1000 * 60 * 60 * 24)));
+  
+  // 月・週の計算（概算）
+  const diffMonths = Math.floor(diffDays / 30);
+  const diffWeeks = Math.floor(diffDays / 7);
 
   return (
-    <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans transition-colors duration-500`}>
+    <div className={`min-h-screen ${currentUser.light} flex flex-col items-center pt-12 px-4 pb-10 font-sans`}>
       
+      {/* ユーザー切り替え */}
       <div className="absolute top-4 left-4 flex flex-wrap justify-start gap-2 max-w-[55%] z-10">
         {USERS.map((u: any) => (
-          <button key={u.id} onClick={() => setCurrentUser(u)} className={`px-3 py-1.5 rounded-full text-xs font-black transition-all shadow-sm ${currentUser.id === u.id ? `bg-gradient-to-r ${u.hue} text-white scale-110 ring-2 ring-white/50` : 'bg-white/50 text-stone-500 opacity-90 hover:bg-white'}`}>
+          <button 
+            key={u.id} 
+            onClick={() => setCurrentUser(u)} 
+            className={`px-4 py-2 rounded-md text-xs font-bold transition-all shadow-sm border-2 ${currentUser.id === u.id ? 'bg-white border-stone-800 text-stone-800' : 'bg-transparent border-transparent text-stone-400 hover:bg-stone-200'}`}
+          >
             {getUserFirstName(u.name)}
           </button>
         ))}
       </div>
 
-      <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-xl mb-4 relative mt-4">
-        <img src="/Rick.png" alt="Rick" className="w-full h-full object-cover" />
-        <div className="absolute bottom-0 left-0 right-0 bg-stone-900/40 text-white text-[10px] text-center font-bold py-0.5 backdrop-blur-sm tracking-widest">ナビゲーター</div>
-      </div>
-      <h1 className={`text-3xl font-black ${currentUser.text} mb-4 tracking-widest drop-shadow-sm`}>毎日受験クエスト</h1>
+      <div className="w-full max-w-sm mt-8">
+        <h1 className={`text-2xl font-black ${currentUser.text} mb-6 tracking-widest text-center`}>漢字練習帳</h1>
 
-      <div className="w-full max-w-sm bg-gradient-to-r from-rose-50 to-orange-50 border-4 border-rose-200 p-4 rounded-3xl shadow-sm mb-4 flex items-center justify-between relative overflow-hidden">
-        <div className="absolute -right-4 -bottom-4 text-7xl opacity-20">🔥</div>
-        <div className="relative z-10">
-          <p className="text-[11px] font-black text-rose-500 mb-1 tracking-widest">受験本番（2027年2月1日）まで</p>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl font-black text-rose-600">あと</span>
-            <span className="text-5xl font-black text-rose-600 drop-shadow-sm">{Math.max(0, diffDays)}</span>
-            <span className="text-xl font-black text-rose-600">日！</span>
-          </div>
+        {/* 受験本番までのカウントダウン */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-stone-200 mb-6 flex items-center justify-between">
+            <div className="pl-3 border-l-4 border-rose-500">
+                <p className="text-[10px] font-bold text-stone-500 mb-1">受験本番（2027年2月1日）まで</p>
+                <div className="flex items-baseline gap-1">
+                    <span className="text-sm font-black text-stone-600">あと</span>
+                    <span className="text-4xl font-black text-rose-600">{diffDays}</span>
+                    <span className="text-sm font-black text-stone-600">日！</span>
+                </div>
+                {diffDays > 0 && (
+                  <p className="text-[10px] font-bold text-stone-400 mt-1">
+                    （約 <span className="text-stone-500">{diffMonths}ヶ月</span> / 約 <span className="text-stone-500">{diffWeeks}週間</span>）
+                  </p>
+                )}
+            </div>
+            <div className="text-3xl pr-2 opacity-80">🔥</div>
         </div>
-        <div className="text-5xl relative z-10 drop-shadow-md animate-bounce">📝</div>
-      </div>
 
-      <section className="mb-4 w-full max-w-sm rounded-3xl border-2 border-indigo-200 bg-white p-4 shadow-md">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black tracking-widest text-indigo-500">🎯 多摩大目黒（特待）・桐光学園</p>
-            <h2 className="mt-1 text-lg font-black text-indigo-900">
-              {examMission.phase === 0 ? '100日合格ロードマップ' : examMission.phase === 4 ? '今日は入試本番' : `第${examMission.phase}期 · ${examMission.title}`}
-            </h2>
-          </div>
-          {examMission.phase > 0 && examMission.phase < 4 && (
-            <span className="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-xs font-black text-indigo-700">DAY {examMission.dayNumber}/100</span>
-          )}
-        </div>
-        <p className="mt-2 text-xs font-bold leading-relaxed text-stone-600">
-          {examMission.phase === 0
-            ? `${examMission.period} · あと${examMission.daysUntilStart}日。${examMission.focus}`
-            : examMission.focus}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {(examMission.categoryIds.length ? examMission.categoryIds : ['exam_frequent', 'idiom', 'synonym_antonym'])
-            .map(id => CATEGORIES.find(category => category.id === id))
-            .filter((category): category is (typeof CATEGORIES)[number] => Boolean(category))
-            .map(category => (
-              <span key={category.id} className="rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-bold text-indigo-700">{category.name}</span>
-            ))}
-        </div>
-        <p className="mt-2 text-right text-[9px] font-bold text-stone-400">{examMission.period} · 毎日10問を目安に特訓</p>
-        <button
-          onClick={() => startGame('mission_100')}
-          disabled={!examMission.isActive}
-          className="mt-3 w-full rounded-2xl bg-indigo-600 py-3 text-sm font-black text-white shadow-md transition active:scale-95 disabled:cursor-not-allowed disabled:bg-stone-300"
-        >
-          {examMission.phase === 0 ? `特訓開始まであと${examMission.daysUntilStart}日` : examMission.phase === 4 ? '100日特訓期間終了' : '今日の合格ミッションを始める'}
-        </button>
-      </section>
-
-      <button onClick={() => startGame('exam')} className="mb-6 w-full max-w-sm py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-rose-600 text-white border-b-4 border-rose-800 hover:bg-rose-500 active:translate-y-1 active:border-b-0 tracking-widest gap-2">
-        <span className="text-xl">🔥</span> 受験モード (手書き弱点特訓)
-      </button>
-
-      <button
-        onClick={fetchCollection}
-        className="mb-8 w-full max-w-sm rounded-3xl border-b-4 border-emerald-600 bg-emerald-500 px-5 py-5 text-lg font-black text-white shadow-lg transition active:translate-y-1 active:border-b-0 flex items-center justify-center gap-3"
-      >
-        <span className="text-2xl">📖</span> 言葉の図鑑 (1日10分カード)
-      </button>
-
-      <div className="w-full max-w-sm bg-white p-4 rounded-3xl shadow-lg mb-6 border-b-4 border-stone-200">
-          <div className="flex items-center justify-between mb-3">
-             <p className="text-xs font-black text-stone-400 flex items-center gap-1"><span>🎯</span> 出題するカテゴリ</p>
-             <button onClick={openKanjiList} className="bg-sky-50 text-sky-600 border border-sky-200 text-[10px] font-black px-3 py-1.5 rounded-full active:scale-95 transition flex items-center gap-1 shadow-sm">
-                <span>📖</span> 漢字リストを眺める
-             </button>
-          </div>
-          <select value={targetKyu} onChange={e => setTargetKyu(e.target.value)} className="w-full p-3 border-2 border-stone-200 rounded-xl text-sm font-black text-stone-700 bg-stone-50 outline-none focus:border-sky-400 mb-5 text-center shadow-inner">
-            <option value="all">すべてのカテゴリから出題</option>
-            <option value="mistakes">🔥 間違えた漢字 (1回以上ミス)</option>
-            <option value="hard">💀 覚えにくい漢字 (2回以上ミス)</option>
-            {CATEGORIES.filter((c: any) => c.id !== 'general').map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-
-          <p className="text-xs font-black text-stone-400 mb-3 flex items-center justify-center gap-1"><span>🕹️</span> 回答モード</p>
-          <div className="grid grid-cols-2 gap-2 mb-2">
-            <button 
-              onClick={() => setSelectedInputMode('quiz_kanji')} 
-              disabled={currentUser.id === 'brother'}
-              className={`py-3 rounded-xl font-black transition-all border-b-4 flex flex-col items-center justify-center gap-1 ${
-                currentUser.id === 'brother'
-                  ? 'bg-stone-200 text-stone-400 cursor-not-allowed opacity-60 border-stone-300'
-                  : selectedInputMode === 'quiz_kanji' 
-                    ? 'bg-orange-500 text-white border-orange-600 shadow-md active:translate-y-1 active:border-b-0' 
-                    : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50 active:translate-y-1 active:border-b-0'
-              }`}
-            >
-              <span className="text-xs">🔘 4択で選ぶ</span>
-              {currentUser.id === 'brother' && <span className="text-[9px] text-rose-500 tracking-tighter">※特訓中につき封印！</span>}
-            </button>
-            <button onClick={() => setSelectedInputMode('typing_read')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'typing_read' ? 'bg-indigo-500 text-white border-indigo-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>⌨️ 読み入力</button>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setSelectedInputMode('write_canvas')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'write_canvas' ? 'bg-emerald-500 text-white border-emerald-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>✍️ 手書き</button>
-            <button onClick={() => setSelectedInputMode('write_self')} className={`py-3 rounded-xl font-black text-xs transition-all border-b-4 active:translate-y-1 active:border-b-0 ${selectedInputMode === 'write_self' ? 'bg-sky-500 text-white border-sky-600 shadow-md' : 'bg-white text-stone-500 border-stone-200 hover:bg-stone-50'}`}>🧠 自己判定</button>
-          </div>
-      </div>
-      
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-5 mb-5 border-b-4 border-stone-200 relative overflow-hidden">
-          <p className="text-xs font-black text-sky-600 mb-3 animate-pulse">{getDailyMessage(currentUser.id)}</p>
+        {/* タイムトラッカーと本日の進捗 */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border-2 border-stone-200 mb-6 relative overflow-hidden">
+          <div className="absolute left-4 top-0 bottom-0 w-px bg-rose-200"></div>
           
-          <div className="bg-stone-50 rounded-2xl p-4 border-2 border-stone-100 mb-4">
-              <p className="text-[10px] font-black text-stone-400 mb-2">🎁 今日の宝箱への道のり</p>
-              <div className="space-y-2 text-left">
-                  <div className="flex items-center gap-2">
-                      <span className="text-xl">{is10MinDone ? '✅' : '🔲'}</span>
-                      <span className={`text-xs font-bold ${is10MinDone ? 'text-emerald-600' : 'text-stone-500'}`}>1日10分のカード学習</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                      <span className="text-xl">{isMission100Done ? '✅' : '🔲'}</span>
-                      <span className={`text-xs font-bold ${isMission100Done ? 'text-emerald-600' : 'text-stone-500'}`}>合格ミッションのクリア</span>
-                  </div>
+          <div className="pl-6">
+            <p className="text-sm font-bold text-stone-500 mb-4 border-b border-stone-100 pb-2">今日の取り組み</p>
+            <div className="flex items-end justify-between mb-4">
+              <div>
+                <p className="text-xs text-stone-400 font-bold mb-1">学習時間</p>
+                <p className="text-3xl font-black text-stone-800">{todayMinutes} <span className="text-sm text-stone-500 font-bold">分</span></p>
               </div>
-          </div>
-
-          {canOpenChest ? (
-              <button 
-                  onClick={openChestRoom} 
-                  className="w-full bg-gradient-to-b from-yellow-400 to-amber-500 text-white font-black py-4 rounded-2xl active:scale-95 transition flex items-center justify-center gap-2 shadow-[0_5px_0_0_#d97706] hover:brightness-110 mb-2 animate-bounce"
-              >
-                  <span className="text-2xl">✨</span> 
-                  <span className="tracking-widest">今日の宝箱を開ける！</span>
-              </button>
-          ) : hasOpenedChest ? (
-              <div className="w-full bg-stone-200 text-stone-400 font-black py-4 rounded-2xl flex items-center justify-center gap-2 shadow-inner mb-2">
-                  <span className="text-2xl grayscale opacity-50">🎁</span> 
-                  <span className="tracking-widest">今日の宝箱は開封済み</span>
+              <div className="text-right">
+                <p className="text-xs text-stone-400 font-bold mb-1">ドリル進捗</p>
+                <div className="flex items-baseline justify-end gap-1">
+                  <p className="text-2xl font-black text-stone-800">{completedCount} <span className="text-sm text-stone-400 font-bold">問</span></p>
+                </div>
               </div>
-          ) : (
-              <div className="w-full bg-stone-100 text-stone-400 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-inner mb-2 border border-dashed border-stone-300">
-                  <span className="text-sm">🔒 条件達成で宝箱が出現！</span>
-              </div>
-          )}
-
-          <button 
-            onClick={() => setShowTipsModal(true)} 
-            className="w-full bg-stone-800 text-stone-100 font-black py-3 rounded-2xl active:scale-95 transition flex items-center justify-center gap-2 shadow-sm hover:bg-stone-700 mt-3"
-          >
-            <span className="text-xl">📚</span>
-            <span className="text-xs tracking-widest">豆知識ノート ({unlockedTips.length})</span>
-          </button>
-      </div>
-
-      {reviewCandidates.length > 0 && (
-        <div className="w-full max-w-sm mb-6 animate-in slide-in-from-top duration-500">
-          <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-rose-200 text-rose-700 text-xs font-bold px-3 py-1 rounded-bl-xl shadow-sm">⚠️ 要復習</div>
-            <h3 className="font-bold text-rose-600 mb-3 text-sm flex items-center gap-1">Rickからの挑戦状 <span className="text-xl">🦴</span></h3>
-            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-              {reviewCandidates.map((w: any) => {
-                const isRevealed = reviewRevealed.includes(w.id)
-                return (
-                  <div key={w.id} onClick={() => toggleReviewReveal(w.id)} className="min-w-[100px] h-32 bg-white rounded-xl shadow-sm flex flex-col items-center justify-center p-2 cursor-pointer active:scale-95 transition border-b-4 border-rose-200">
-                    {!isRevealed ? (
-                      <div className="text-center animate-in zoom-in w-full"><p className="font-black text-stone-800 text-4xl leading-tight break-words">{w.kanji}</p><p className="font-bold text-rose-400 text-lg mt-2">?</p></div>
-                    ) : (
-                      <div className="text-center animate-in zoom-in w-full"><div className="text-3xl mb-1">{w.emoji}</div><p className="font-bold text-sky-600 text-xs leading-tight bg-sky-50 px-2 py-0.5 rounded">{renderReading(w.reading, w.okurigana)}</p></div>
-                    )}
-                  </div>
-                )
-              })}
+            </div>
+            
+            {/* プログレスバー（10問ごとのループを表示） */}
+            <div className="w-full bg-stone-100 rounded-full h-2 mb-2 relative overflow-hidden">
+              <div 
+                className="bg-stone-800 h-2 rounded-full transition-all duration-500" 
+                style={{ width: `${(currentSetProgress / setGoal) * 100}%` }}
+              ></div>
+            </div>
+            
+            <div className="flex justify-between items-center mt-2">
+              <p className="text-xs font-bold text-stone-400">次のスタンプまで あと{setGoal - currentSetProgress}問</p>
+              {isCompletedOnce && (
+                <p className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                  💮 {completedSets}周クリア！
+                </p>
+              )}
             </div>
           </div>
         </div>
-      )}
 
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-lg p-6 mb-6 relative border-2 border-stone-50">
-        <div className="flex items-center justify-between mb-3"><span className="text-stone-500 font-bold text-sm">📅 今日の進捗</span><span className={`text-2xl font-black ${currentUser.text}`}>{dailyProgress?.count || 0} <span className="text-base text-stone-400">/ {displayCount} 問</span></span></div>
-        <div className="w-full bg-stone-100 rounded-full h-5 shadow-inner p-0.5"><div className={`h-full rounded-full transition-all duration-1000 bg-gradient-to-r ${currentUser.hue}`} style={{ width: `${Math.min(((dailyProgress?.count || 0) / displayCount) * 100, 100)}%` }}></div></div>
-        {dailyProgress?.is_completed ? <p className="text-center text-orange-500 font-bold mt-3 animate-bounce">💮 今日のノルマ達成！えらい！</p> : <p className="text-center text-stone-400 text-xs mt-3 font-bold">目標まであと {Math.max(0, displayCount - (dailyProgress?.count || 0))} 問！</p>}
-      </div>
-      
-      <div className="space-y-3 w-full max-w-sm mb-6">
-        {hasParentChallenge && (
-          <button onClick={() => { if (!isParentDone) startGame('parent_challenge'); }} className={`w-full py-4 px-6 rounded-2xl font-black shadow-lg transform transition-all flex items-center justify-between ${isParentDone ? 'bg-stone-200 text-white shadow-none' : 'bg-gradient-to-r from-rose-500 to-orange-500 text-white animate-pulse active:scale-95'}`}>
-            <div className="flex items-center gap-3"><span className="text-2xl">🔥</span> <span className="tracking-wide">パパからの挑戦状</span></div>
-            {isParentDone && <span className="bg-white/30 px-3 py-1 rounded-full text-xs">クリア済</span>}
+        {/* メインアクション：ドリル */}
+        <button 
+          onClick={() => startGame('daily_drill')} 
+          className="w-full py-6 px-6 rounded-lg font-black shadow-sm transition-all border-2 mb-6 flex items-center justify-between group bg-stone-800 border-stone-900 text-white hover:bg-stone-700 active:scale-95"
+        >
+          <div className="flex items-center gap-4">
+            <span className="text-2xl">✍️</span> 
+            <span className="text-lg tracking-widest">{isCompletedOnce ? 'ドリル（追加 10問）' : 'ドリル'}</span>
+          </div>
+          <span className="text-xl opacity-50 group-hover:translate-x-1 transition-transform">→</span>
+        </button>
+
+        {/* 3つのノート・辞書への導線 */}
+        <div className="grid grid-cols-2 gap-3 mb-8">
+          <button onClick={() => setView('weak_note')} className="py-4 px-2 rounded-lg font-bold shadow-sm transition-all border-2 bg-white border-stone-200 text-stone-600 hover:bg-stone-50 active:scale-95 flex flex-col items-center gap-2">
+            <span className="text-2xl">💀</span>
+            <span className="text-xs tracking-widest">苦手ノート</span>
+          </button>
+          <button onClick={() => setView('my_note')} className="py-4 px-2 rounded-lg font-bold shadow-sm transition-all border-2 bg-white border-stone-200 text-stone-600 hover:bg-stone-50 active:scale-95 flex flex-col items-center gap-2">
+            <span className="text-2xl">⭐</span>
+            <span className="text-xs tracking-widest">自分ノート</span>
+          </button>
+          <button onClick={() => setView('dictionary')} className="col-span-2 py-4 px-4 rounded-lg font-bold shadow-sm transition-all border-2 bg-white border-stone-200 text-stone-600 hover:bg-stone-50 active:scale-95 flex items-center justify-center gap-3">
+            <span className="text-xl">📚</span>
+            <span className="text-sm tracking-widest">漢字辞書</span>
+          </button>
+        </div>
+
+        {/* カレンダー（ドリルの記録） */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-2 pl-2">
+            <span className="text-lg">📖</span>
+            <h2 className="text-sm font-bold text-stone-600">ドリルの記録</h2>
+          </div>
+          {renderCalendar()}
+          <p className="text-[10px] text-stone-400 mt-2 text-center">※日付をタップするとその日のノートが見られます</p>
+        </div>
+
+        {/* 保護者管理メニュー */}
+        {(currentUser.id === 'kenta' || currentUser.id === 'mami') && (
+          <button 
+            onClick={() => { stopSpeaking(); fetchAdminStats(currentUser); setAdminTargetUser(currentUser); setView('admin'); }} 
+            className="w-full py-4 rounded-lg font-bold transition-all bg-stone-200 text-stone-700 hover:bg-stone-300 text-sm border-2 border-stone-300 mt-4"
+          >
+            ⚙️ 保護者管理
           </button>
         )}
 
-        <button onClick={() => { if (!dailyProgress?.is_completed) startGame('daily'); }} className={`w-full py-5 px-6 rounded-2xl font-black shadow-xl transform transition-all flex items-center justify-between ${dailyProgress?.is_completed ? 'bg-sky-200 text-white shadow-none' : `bg-gradient-to-r ${currentUser.hue} text-white hover:opacity-90 active:scale-95`}`}>
-          <div className="flex items-center gap-3"><span className="text-3xl">🚀</span> <span className="text-xl tracking-wider">今日の冒険へ</span></div>
-          {dailyProgress?.is_completed ? <span className="bg-white/30 px-3 py-1 rounded-full text-xs">クリア済</span> : <span className="bg-white/30 px-3 py-1 rounded-full text-sm">{displayCount}問</span>}
-        </button>
-        
-        <div className={`w-full p-4 rounded-2xl shadow-md border-2 transition-all ${isRickDone ? 'bg-stone-100 border-stone-200' : 'bg-white border-stone-100'}`}>
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2"><span className="text-xl">⚡</span> <span className={`font-bold ${isRickDone ? 'text-stone-400' : 'text-stone-700'}`}>Rickの特訓</span></div>
-                {isRickDone && <span className="text-xs text-stone-400 font-bold">クリア済</span>}
-            </div>
-            <div className="flex gap-1 mb-3">
-                <button onClick={() => setRickMode('read')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'read' ? 'bg-orange-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>👀 読む</button>
-                <button onClick={() => setRickMode('think')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'think' ? 'bg-sky-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>🧠 思い</button>
-                <button onClick={() => setRickMode('write')} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${rickMode === 'write' ? 'bg-emerald-500 text-white shadow-inner' : 'bg-stone-50 text-stone-400 hover:bg-stone-100'}`}>✍️ 手書き</button>
-            </div>
-            <button onClick={() => { if (!isRickDone) startGame('rick_challenge'); }} className={`w-full py-3 rounded-xl font-black text-sm tracking-widest transition-all ${isRickDone ? 'bg-stone-200 text-white cursor-not-allowed' : 'bg-stone-800 text-white shadow-md active:scale-95 hover:bg-stone-700'}`}>特訓スタート！</button>
-        </div>
-
-        <button onClick={() => startGame('weekend')} className={`w-full py-3 px-6 rounded-2xl font-bold shadow-md transform transition-all flex items-center justify-between ${isWeekendDone ? 'bg-stone-200 text-white shadow-none' : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white active:scale-95'}`}>
-          <div className="flex items-center gap-3"><span className="text-xl">🏰</span> <span>週末ボスバトル</span></div>
-          {isWeekendDone && <span className="bg-white/30 px-3 py-1 rounded-full text-xs">撃破済</span>}
-        </button>
-
-        <button onClick={() => startGame('revenge')} className="w-full py-4 px-6 rounded-2xl font-black shadow-md transform transition-all flex items-center justify-center bg-stone-800 text-rose-400 border-b-4 border-stone-900 hover:bg-stone-700 active:translate-y-1 active:border-b-0 tracking-widest gap-2">
-          <span className="text-xl">💀</span> リベンジ (無限復習)
-        </button>
-
-        <button onClick={() => startGame('free')} className="mt-4 w-full bg-white border-b-4 border-sky-400 text-sky-500 font-black py-4 px-4 rounded-2xl shadow-sm active:translate-y-1 active:border-b-0 transition flex justify-center items-center gap-2 hover:bg-stone-50">
-          <span className="text-xl">⚔️</span> フリー
-        </button>
       </div>
-
-      <div className="mb-6 w-full max-w-sm">{renderCalendar()}</div>
-
-      {dailyProgress?.parent_reply && (
-        <div className="mb-8 w-full max-w-sm bg-white border-4 border-orange-200 rounded-3xl p-6 shadow-lg relative">
-          <div className="absolute -top-4 left-6 bg-orange-400 text-white text-xs font-black tracking-widest px-4 py-1.5 rounded-full shadow-sm">パパ・ママからのお返事</div>
-          <p className="text-left text-base font-bold text-stone-700 whitespace-pre-wrap leading-relaxed mt-2">「{dailyProgress.parent_reply}」</p>
-        </div>
-      )}
-
-      {(currentUser.id === 'kenta' || currentUser.id === 'mami') && (
-        <button 
-          onClick={() => { stopSpeaking(); fetchAdminStats(currentUser); setAdminTargetUser(currentUser); setView('admin'); }} 
-          className="mb-8 bg-stone-800 hover:bg-stone-900 text-white font-black py-4 px-8 rounded-2xl w-full max-w-xs shadow-xl text-sm transition-all active:scale-95 border-b-4 border-stone-950 flex items-center justify-center gap-2"
-        >
-          <span>👨‍👩‍👧‍👦</span> 保護者管理メニュー
-        </button>
-      )}
-
-      {showKanjiList && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in" onClick={() => setShowKanjiList(false)}>
-          <div className="bg-white w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in duration-300" onClick={e => e.stopPropagation()}>
-            
-            <div className="bg-sky-50 p-5 border-b-4 border-sky-100 flex justify-between items-center shrink-0">
-              <div>
-                <h3 className="text-xl font-black text-sky-800 flex items-center gap-2"><span>📖</span> 漢字リスト</h3>
-                <p className="text-[10px] font-bold text-sky-600 mt-1">選択中のカテゴリの漢字を眺めよう</p>
-              </div>
-              <button onClick={() => setShowKanjiList(false)} className="bg-white text-sky-400 w-10 h-10 rounded-full font-black text-xl shadow-sm active:scale-90 transition border border-sky-100">✕</button>
-            </div>
-
-            <div className="flex p-2 bg-stone-100 shrink-0 gap-2">
-              <button onClick={() => setListTab('learning')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'learning' ? 'bg-white text-sky-700 shadow-sm border-2 border-sky-100' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
-                未習得 ({kanjiList.filter(w => w.currentStatus !== 'gold').length})
-              </button>
-              <button onClick={() => setListTab('mistakes')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'mistakes' ? 'bg-rose-50 text-rose-600 shadow-sm border-2 border-rose-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
-                要復習 ({kanjiList.filter(w => w.mistakeCount > 0 && w.currentStatus !== 'gold').length})
-              </button>
-              <button onClick={() => setListTab('mastered')} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${listTab === 'mastered' ? 'bg-amber-50 text-amber-600 shadow-sm border-2 border-amber-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
-                覚えた！ ({kanjiList.filter(w => w.currentStatus === 'gold').length})
-              </button>
-            </div>
-            
-            <div className="p-4 overflow-y-auto bg-stone-50 flex-1 space-y-3 no-scrollbar relative">
-              {isLoadingList ? (
-                <div className="flex flex-col items-center justify-center py-20 text-stone-400">
-                  <div className="animate-spin text-4xl mb-4">🌀</div>
-                  <p className="font-bold text-sm tracking-widest">読み込み中...</p>
-                </div>
-              ) : (
-                (() => {
-                  const filteredList = kanjiList.filter(w => {
-                    if (listTab === 'mastered') return w.currentStatus === 'gold';
-                    if (listTab === 'mistakes') return w.mistakeCount > 0 && w.currentStatus !== 'gold';
-                    return w.currentStatus !== 'gold';
-                  });
-
-                  if (filteredList.length === 0) {
-                    return (
-                      <div className="text-center py-20">
-                        <p className="text-4xl mb-4">{listTab === 'mistakes' ? '✨' : '📭'}</p>
-                        <p className="text-stone-400 font-bold text-sm">このリストにはまだ<br/>漢字がないよ！</p>
-                      </div>
-                    );
-                  }
-
-                  return filteredList.map((w, i) => (
-                    <div key={w.id} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-stone-100 flex items-center gap-4">
-                      <div className="shrink-0 flex flex-col items-center justify-center bg-stone-50 w-14 h-14 rounded-xl border border-stone-100">
-                        <span className="text-2xl font-black text-stone-800">{w.kanji}</span>
-                      </div>
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="text-base font-black text-sky-700">{renderReading(w.reading, w.okurigana)}</p>
-                          {w.mistakeCount > 0 && (
-                            <span className="text-[9px] bg-rose-100 text-rose-600 font-black px-1.5 py-0.5 rounded shadow-sm">ミス: {w.mistakeCount}回</span>
-                          )}
-                        </div>
-                        {w.sentence && <p className="text-[10px] font-bold text-stone-500 leading-snug">{w.sentence.replace('□', '〇')}</p>}
-                      </div>
-                      <button 
-                        onClick={() => handleToggleRemembered(w)} 
-                        className={`shrink-0 px-3 py-2 rounded-xl text-[10px] font-black transition-all border-b-2 active:translate-y-0.5 active:border-b-0 ${
-                          w.currentStatus === 'gold' 
-                            ? 'bg-stone-100 text-stone-400 border-stone-200 hover:bg-stone-200' 
-                            : 'bg-amber-100 text-amber-600 border-amber-200 hover:bg-amber-200'
-                        }`}
-                      >
-                        {w.currentStatus === 'gold' ? '戻す' : '👑 覚えた'}
-                      </button>
-                    </div>
-                  ));
-                })()
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showTipsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/80 backdrop-blur-sm animate-in fade-in" onClick={() => setShowTipsModal(false)}>
-          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-            
-            <div className="bg-stone-50 p-5 text-center border-b-4 border-stone-200 shrink-0">
-              <h3 className="text-xl font-black text-stone-700 flex items-center justify-center gap-2"><span>📚</span> 豆知識ノート</h3>
-              <input
-                type="search"
-                value={tipSearchQuery}
-                onChange={(event) => setTipSearchQuery(event.target.value)}
-                placeholder="キーワードで検索..."
-                aria-label="豆知識を検索"
-                className="mt-4 w-full rounded-xl border-2 border-stone-200 bg-white px-4 py-3 text-sm font-bold text-stone-700 outline-none focus:border-sky-400"
-              />
-            </div>
-
-            <div className="flex p-2 bg-stone-100 shrink-0 gap-2 border-b border-stone-200">
-              <button onClick={() => setTipsTab('all')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'all' ? 'bg-white text-stone-700 shadow-sm border-2 border-stone-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
-                すべて
-              </button>
-              <button onClick={() => setTipsTab('minecraft')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'minecraft' ? 'bg-emerald-50 text-emerald-700 shadow-sm border-2 border-emerald-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
-                マイクラ
-              </button>
-              <button onClick={() => setTipsTab('splatoon')} className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${tipsTab === 'splatoon' ? 'bg-yellow-50 text-yellow-600 shadow-sm border-2 border-yellow-200' : 'text-stone-400 hover:bg-stone-200 border-2 border-transparent'}`}>
-                スプラ
-              </button>
-            </div>
-            
-            <div className="p-4 overflow-y-auto bg-stone-50 flex-1 space-y-3 no-scrollbar">
-              {filteredUnlockedTips.length > 0 ? (
-                filteredUnlockedTips.map(({ tip, index, parsed }: { tip: string; index: number; parsed: any }) => (
-                  <article key={`${index}-${tip}`} className="bg-white p-4 rounded-2xl shadow-sm border-2 border-stone-100 relative overflow-hidden">
-                    {parsed.type === 'minecraft' && <span className="absolute top-0 right-0 bg-emerald-500 text-white text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-sm">マイクラ</span>}
-                    {parsed.type === 'splatoon' && <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[9px] font-black px-3 py-1 rounded-bl-xl shadow-sm">スプラ</span>}
-                    
-                    <div className="flex items-start gap-3 mt-1">
-                      <span className="shrink-0 text-xl" aria-hidden="true">📜</span>
-                      <p className="min-w-0 flex-1 break-words text-sm font-bold text-stone-700 leading-relaxed">{parsed.text}</p>
-                    </div>
-                    <p className="mt-2 text-right text-[10px] font-black text-stone-300">豆知識 #{index + 1}</p>
-                  </article>
-                ))
-              ) : unlockedTips.length > 0 ? (
-                <div className="py-10 text-center">
-                  <p className="text-3xl mb-3">🔎</p>
-                  <p className="font-bold text-stone-400">一致する豆知識がありません</p>
-                </div>
-              ) : (
-                <div className="text-center py-10">
-                  <p className="text-4xl mb-4">🔒</p>
-                  <p className="text-stone-400 font-bold leading-relaxed">まだ豆知識がありません。<br/>10分学習とミッションをクリアして<br/>宝箱を開けよう！</p>
-                </div>
-              )}
-            </div>
-            
-            <div className="p-4 bg-white border-t border-stone-100 shrink-0">
-              <button onClick={() => setShowTipsModal(false)} className="w-full py-4 bg-stone-800 text-white rounded-2xl font-black text-lg shadow-lg active:scale-95 transition">閉じる ✖</button>
-            </div>
-            
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
