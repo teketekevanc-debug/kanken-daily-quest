@@ -350,3 +350,17 @@ const renderReading = useCallback((reading: string, okurigana?: string | null) =
 
   return null;
 }
+
+// --- 型定義（追加） ---
+export type ProgressStats = {
+  total: number;
+  mastered: number;
+  ranks: { learning: number; bronze: number; silver: number; gold: number; };
+  weakWords: any[];
+  checkWords: any[];
+  recentLogs: any[];
+  graphData: any[];
+  pieData: any[];
+};
+
+export type KanjiWord = any;
