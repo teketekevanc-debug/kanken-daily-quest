@@ -1,8 +1,8 @@
 // components/AdminScreen.tsx
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { USERS, CATEGORIES, getUserFirstName } from '@/lib/constants'
+import { USERS, CATEGORIES } from '@/lib/constants'
 
 const BAR_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
 
@@ -38,17 +38,17 @@ export default function AdminScreen(props: AdminScreenProps) {
 
   const [adminTab, setAdminTab] = useState<'stats' | 'add_word' | 'manage'>('stats');
   
-  // 新しいカテゴリのデフォルト値を設定
   const defaultCategory = CATEGORIES.find(c => c.id.startsWith('v2_'))?.id || CATEGORIES[0]?.id;
   const [newWord, setNewWord] = useState({ kanji: '', reading: '', okurigana: '', usage_example: '', origin_logic: '', category: defaultCategory });
   const [isMistakeInitial, setIsMistakeInitial] = useState(false);
 
   const [manageSearchQuery, setManageSearchQuery] = useState('');
-  const [manageCategory, setManageCategory] = useState('all'); // ★追加: 管理画面用のカテゴリ絞り込み
+  const [manageCategory, setManageCategory] = useState('all'); 
   const [editingWord, setEditingWord] = useState<any>(null);
 
-  const matchingLogs = selectedLogDate ? monthlyLogs.filter(l => l.date === selectedLogDate) : [];
-  const [selectedLog] = matchingLogs;
+  // 安全に対象日のログを取得する
+  const matchingLogs = selectedLogDate && monthlyLogs ? monthlyLogs.filter(l => l.date === selectedLogDate) : [];
+  const selectedLog = matchingLogs.length > 0 ? matchingLogs[0] : null;
   const [rTopL, rTopR, rBotR, rBotL] = BAR_RADIUS;
 
   const onAddWordClick = () => {
@@ -61,37 +61,67 @@ export default function AdminScreen(props: AdminScreenProps) {
     setIsMistakeInitial(false); 
   };
 
-  // ★変更: カテゴリ絞り込みとテキスト検索の両方を適用
   const filteredManageWords = allWordsList.filter(w => {
     if (manageCategory !== 'all' && w.kanji_level !== manageCategory) return false;
     if (manageSearchQuery && !w.kanji.includes(manageSearchQuery) && !w.reading.includes(manageSearchQuery) && !(w.usage_example && w.usage_example.includes(manageSearchQuery))) return false;
     return true;
   });
 
+  // ログの集計を安全に行う処理
+  const modeStats = useMemo(() => {
+    if (!selectedLog || !selectedLog.details || !Array.isArray(selectedLog.details)) return {};
+    return selectedLog.details.reduce((acc: any, d: any) => {
+      const modeName = d.mode || 'ドリル';
+      if (!acc[modeName]) acc[modeName] = { count: 0, time: 0 };
+      acc[modeName].count++;
+      acc[modeName].time += (d.timeSpent || 0);
+      return acc;
+    }, {});
+  }, [selectedLog]);
+
   return (
-    <div className="min-h-screen bg-stone-100 font-sans p-4 md:p-8 pb-24 text-center">
+    <div className="min-h-screen bg-stone-100 font-sans p-4 md:p-8 pb-24 text-center relative z-0">
       
-      {/* ログ詳細モーダル */}
+      {/* ログ詳細モーダル（カレンダーの日付を押した時） */}
       {selectedLogDate && (
         <div className="fixed inset-0 bg-stone-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedLogDate(null)}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl relative" onClick={e => e.stopPropagation()}>
             <h3 className="font-black text-xl mb-4 text-stone-800">{selectedLogDate} の記録</h3>
 
-            <div className="overflow-y-auto flex-1 mb-4 space-y-2 pr-1 no-scrollbar">
-              {selectedLog?.details?.length ? (
-                selectedLog.details.map((d: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center p-3 bg-stone-50 rounded-lg border border-stone-200">
-                    <span className="font-black text-stone-700 flex-1 text-left text-lg">{d.word}</span>
-                    <span className="text-xs font-bold text-stone-400 mx-2">⏱️ {d.timeSpent || 0}秒</span>
-                    <span className="text-xl w-8 text-right">{d.result === 'correct' ? '⭕' : '❌'}</span>
+            <div className="overflow-y-auto flex-1 mb-4 space-y-4 pr-1 no-scrollbar text-left">
+              {selectedLog && selectedLog.details && selectedLog.details.length > 0 ? (
+                <>
+                  <div className="bg-stone-50 rounded-lg p-3 border border-stone-200 shadow-sm">
+                    <h5 className="text-xs font-black text-stone-500 mb-2 border-b border-stone-200 pb-1">⏱️ 項目別の取り組み時間</h5>
+                    <div className="flex flex-col gap-1.5">
+                      {Object.entries(modeStats).map(([mName, mData]: any) => (
+                        <div key={mName} className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-stone-600 truncate">{mName}</span>
+                          <span className="text-stone-500 bg-white px-2 py-0.5 rounded border border-stone-200 font-bold flex gap-3 shadow-sm shrink-0">
+                            <span>{mData.count} 回</span>
+                            <span className="text-sky-600 w-12 text-right">{Math.floor(mData.time / 60)}分{mData.time % 60}秒</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))
+                  
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {selectedLog.details.map((d: any, i: number) => (
+                      <div key={i} className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold border ${d.result === 'correct' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : d.result === 'done' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                        <span className="text-sm w-4 text-center">{d.result === 'correct' ? '⭕' : d.result === 'done' ? '👀' : '❌'}</span>
+                        <span>{d.word || '?'}</span>
+                        {(d.timeSpent || 0) > 0 && <span className="opacity-60 ml-1 font-normal text-[10px]">{d.timeSpent}s</span>}
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
-                <p className="text-stone-400 font-bold py-4 text-center">学習データなし</p>
+                <p className="text-stone-400 font-bold py-4 text-center">この日の学習データはありません</p>
               )}
             </div>
 
-            <button onClick={() => setSelectedLogDate(null)} className="w-full bg-stone-800 text-white font-black py-4 rounded-xl shadow-sm active:scale-95 transition-all">
+            <button type="button" onClick={() => setSelectedLogDate(null)} className="w-full mt-2 bg-stone-800 text-white font-black py-4 rounded-xl shadow-sm active:scale-95 transition-all">
               閉じる
             </button>
           </div>
@@ -115,8 +145,8 @@ export default function AdminScreen(props: AdminScreenProps) {
               <textarea className="w-full border border-stone-300 p-3 rounded-lg font-bold outline-none focus:border-stone-500 bg-white min-h-[80px] text-stone-800" placeholder="なりたち・解説（任意）" value={editingWord.origin_logic || ''} onChange={e => setEditingWord({...editingWord, origin_logic: e.target.value})} />
               
               <div className="flex gap-2 mt-4">
-                <button onClick={() => setEditingWord(null)} className="flex-1 bg-stone-100 text-stone-600 py-3 rounded-lg font-black shadow-sm border border-stone-200">キャンセル</button>
-                <button 
+                <button type="button" onClick={() => setEditingWord(null)} className="flex-1 bg-stone-100 text-stone-600 py-3 rounded-lg font-black shadow-sm border border-stone-200">キャンセル</button>
+                <button type="button" 
                   onClick={() => {
                     handleUpdateWord(editingWord.id, {
                       kanji: editingWord.kanji,
@@ -139,22 +169,22 @@ export default function AdminScreen(props: AdminScreenProps) {
 
       <div className="max-w-2xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <button onClick={() => setView('menu')} className="text-stone-600 font-bold bg-white px-5 py-2 rounded-md shadow-sm border border-stone-200 hover:bg-stone-50 transition active:scale-95">← メニューへ</button>
+          <button type="button" onClick={() => setView('menu')} className="text-stone-600 font-bold bg-white px-5 py-2 rounded-md shadow-sm border border-stone-200 hover:bg-stone-50 transition active:scale-95">← メニューへ</button>
           <h2 className="text-xl font-black text-stone-800">保護者管理</h2>
         </div>
 
         <div className="flex flex-wrap justify-center gap-2 mb-6">
           {USERS.map((u: any) => (
-            <button key={u.id} onClick={() => { setAdminTargetUser(u); fetchAdminStats(u); }} className={`px-4 py-2 rounded-md text-sm font-black transition-all shadow-sm border ${adminTargetUser.id === u.id ? 'bg-stone-800 text-white border-stone-900' : 'bg-white text-stone-400 border-stone-200 hover:bg-stone-50'}`}>
+            <button type="button" key={u.id} onClick={() => { setAdminTargetUser(u); fetchAdminStats(u); }} className={`px-4 py-2 rounded-md text-sm font-black transition-all shadow-sm border ${adminTargetUser.id === u.id ? 'bg-stone-800 text-white border-stone-900' : 'bg-white text-stone-400 border-stone-200 hover:bg-stone-50'}`}>
               {u.name}
             </button>
           ))}
         </div>
 
         <div className="bg-white rounded-lg p-1.5 mb-6 shadow-sm flex border border-stone-200">
-          <button onClick={() => setAdminTab('stats')} className={`flex-1 py-2 text-sm font-black rounded-md transition-all ${adminTab === 'stats' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:bg-stone-50'}`}>📊 成績・記録</button>
-          <button onClick={() => setAdminTab('add_word')} className={`flex-1 py-2 text-sm font-black rounded-md transition-all ${adminTab === 'add_word' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:bg-stone-50'}`}>➕ 単語の追加</button>
-          <button onClick={() => { setAdminTab('manage'); fetchAllWordsForEdit(); }} className={`flex-1 py-2 text-sm font-black rounded-md transition-all ${adminTab === 'manage' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:bg-stone-50'}`}>📝 編集・削除</button>
+          <button type="button" onClick={() => setAdminTab('stats')} className={`flex-1 py-2 text-sm font-black rounded-md transition-all ${adminTab === 'stats' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:bg-stone-50'}`}>📊 成績・記録</button>
+          <button type="button" onClick={() => setAdminTab('add_word')} className={`flex-1 py-2 text-sm font-black rounded-md transition-all ${adminTab === 'add_word' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:bg-stone-50'}`}>➕ 単語の追加</button>
+          <button type="button" onClick={() => { setAdminTab('manage'); fetchAllWordsForEdit(); }} className={`flex-1 py-2 text-sm font-black rounded-md transition-all ${adminTab === 'manage' ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:bg-stone-50'}`}>📝 編集・削除</button>
         </div>
 
         <div className="space-y-6">
@@ -198,7 +228,7 @@ export default function AdminScreen(props: AdminScreenProps) {
                         <span className="bg-rose-50 text-rose-600 px-2 py-0.5 rounded text-xs font-black shrink-0">{w.mistakes}回</span>
                       </li>
                     ))}
-                    {(stats?.weakWords?.length === 0) && <li className="text-stone-400 text-xs font-bold">該当なし</li>}
+                    {(!stats || !stats.weakWords || stats.weakWords.length === 0) && <li className="text-stone-400 text-xs font-bold">該当なし</li>}
                   </ul>
                 </div>
               </div> 
@@ -229,7 +259,7 @@ export default function AdminScreen(props: AdminScreenProps) {
                 <span className="text-xs font-bold text-stone-500">連続記録の手動修正:</span>
                 <div className="flex gap-2">
                   <input type="number" className="w-16 p-1 text-center border border-stone-300 rounded font-bold text-stone-800" value={editStreak} onChange={e => setEditStreak(parseInt(e.target.value) || 0)} />
-                  <button onClick={handleSaveStreak} className="bg-stone-300 text-stone-700 text-xs font-bold px-3 py-1 rounded active:scale-95">保存</button>
+                  <button type="button" onClick={handleSaveStreak} className="bg-stone-300 text-stone-700 text-xs font-bold px-3 py-1 rounded active:scale-95">保存</button>
                 </div>
               </div>
 
@@ -263,7 +293,7 @@ export default function AdminScreen(props: AdminScreenProps) {
                   <span className="text-sm">🔥 登録と同時に「1回ミス扱い」にして復習に出やすくする</span>
                 </label>
 
-                <button onClick={onAddWordClick} className="w-full bg-stone-800 text-white py-4 rounded-lg font-black text-lg shadow-sm active:scale-95 transition hover:bg-stone-700">登録する</button>
+                <button type="button" onClick={onAddWordClick} className="w-full bg-stone-800 text-white py-4 rounded-lg font-black text-lg shadow-sm active:scale-95 transition hover:bg-stone-700">登録する</button>
               </div>
             </div>
           )}
@@ -276,7 +306,6 @@ export default function AdminScreen(props: AdminScreenProps) {
                   <span className="text-xs font-bold text-stone-400 bg-stone-100 px-2 py-1 rounded">全 {allWordsList.length} 件</span>
                 </div>
                 
-                {/* ★ 変更: カテゴリ絞り込み用のセレクトボックスを追加 */}
                 <div className="flex flex-col sm:flex-row gap-2">
                   <select 
                     value={manageCategory} 
@@ -321,11 +350,11 @@ export default function AdminScreen(props: AdminScreenProps) {
                       </div>
 
                       <div className="flex items-center justify-end gap-2">
-                         <button onClick={() => toggleMasterStatus(w.id, w.currentStatus)} className={`px-3 py-1.5 rounded-md text-[10px] font-black transition-all border ${w.currentStatus === 'gold' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-white text-stone-400 border-stone-200 hover:bg-stone-100'}`}>
+                         <button type="button" onClick={() => toggleMasterStatus(w.id, w.currentStatus)} className={`px-3 py-1.5 rounded-md text-[10px] font-black transition-all border ${w.currentStatus === 'gold' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 'bg-white text-stone-400 border-stone-200 hover:bg-stone-100'}`}>
                            {w.currentStatus === 'gold' ? '解除' : '習得済にする'}
                          </button>
-                         <button onClick={() => setEditingWord(w)} className="bg-white text-stone-600 px-3 py-1.5 rounded-md border border-stone-200 hover:bg-stone-100 transition-all font-bold text-[10px]">編集</button>
-                         <button onClick={() => handleDeleteWord(w.id)} className="bg-white text-rose-500 px-3 py-1.5 rounded-md border border-rose-200 hover:bg-rose-50 transition-all font-bold text-[10px]">削除</button>
+                         <button type="button" onClick={() => setEditingWord(w)} className="bg-white text-stone-600 px-3 py-1.5 rounded-md border border-stone-200 hover:bg-stone-100 transition-all font-bold text-[10px]">編集</button>
+                         <button type="button" onClick={() => handleDeleteWord(w.id)} className="bg-white text-rose-500 px-3 py-1.5 rounded-md border border-rose-200 hover:bg-rose-50 transition-all font-bold text-[10px]">削除</button>
                       </div>
                     </div>
                   )

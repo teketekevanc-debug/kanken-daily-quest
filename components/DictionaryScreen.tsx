@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import KanjiGallery from './KanjiGallery'
 import { CATEGORIES } from '@/lib/constants'
+import FloatingTimer from './FloatingTimer'
 
 type DictionaryScreenProps = {
   currentUser: any;
@@ -12,9 +13,10 @@ type DictionaryScreenProps = {
   renderReading: (reading: string, okurigana?: string | null) => React.ReactNode;
   speakWord: (text: string) => void;
   getFullReading: (reading: string, okurigana?: string | null) => string;
+onWordViewed?: (word: any, timeSpent: number) => void;
 }
 
-export default function DictionaryScreen({ currentUser, allWordsList, setView, toggleMyNoteStatus, renderReading, speakWord, getFullReading }: DictionaryScreenProps) {
+export default function DictionaryScreen({ currentUser, allWordsList, setView, toggleMyNoteStatus, renderReading, speakWord, getFullReading, onWordViewed }: DictionaryScreenProps) {
   const [tab, setTab] = useState<'current' | 'legacy'>('current');
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -84,11 +86,11 @@ export default function DictionaryScreen({ currentUser, allWordsList, setView, t
           <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
         </div>
       </div>
-
-      {/* 漢字ギャラリーエリア */}
-      <div className="flex-1 overflow-y-auto p-4 bg-stone-100">
-         <KanjiGallery words={filteredWords} renderReading={renderReading} speakWord={speakWord} getFullReading={getFullReading} toggleMyNoteStatus={toggleMyNoteStatus} />
+    {/* 漢字ギャラリーエリア */}
+      <div className="flex-1 overflow-y-auto p-4 bg-stone-100 relative">
+         <FloatingTimer /> {/* ★追加 */}
+         <KanjiGallery words={filteredWords} renderReading={renderReading} speakWord={speakWord} getFullReading={getFullReading} toggleMyNoteStatus={toggleMyNoteStatus} onWordViewed={onWordViewed}/>
       </div>
-    </div>
+          </div>
   )
 }

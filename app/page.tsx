@@ -2,10 +2,9 @@
 'use client'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from "@/lib/supabaseClient";
-import { USERS, MODE_NAMES } from '@/lib/constants'
+import { USERS, CATEGORIES, MODE_NAMES } from '@/lib/constants'
 import type { KanjiWord, ProgressStats } from '@/lib/constants'
 
-// コンポーネント
 import MenuScreen from '@/components/MenuScreen'
 import AdminScreen from '@/components/AdminScreen'
 import PracticeScreen from '@/components/PracticeScreen'
@@ -13,6 +12,7 @@ import NotebookScreen from '@/components/NotebookScreen'
 import DictionaryScreen from '@/components/DictionaryScreen'
 import WeakNoteScreen from '@/components/WeakNoteScreen'
 import MyNoteScreen from '@/components/MyNoteScreen'
+import FloatingTimer from '@/components/FloatingTimer'
 
 const getJSTDate = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
 const formatDate = (dateObj: Date) => {
@@ -29,7 +29,7 @@ export default function Home() {
 
   const [currentUser, setCurrentUser] = useState(defaultUser)
   const [view, setView] = useState<'menu'|'game'|'notebook'|'weak_note'|'my_note'|'dictionary'|'admin'>('menu')
-  const [mode, setMode] = useState<'daily_drill'>('daily_drill')
+  const [mode, setMode] = useState<string>('v2_rank_a')
   const [loading, setLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -126,12 +126,13 @@ export default function Home() {
     }, { onConflict: 'user_id, question_id' });
   };
 
-  const startGame = async (selectedMode: any) => {
+  const startGame = async (selectedCategoryId: string) => {
     setLoading(true);
-    setMode(selectedMode);
+    setMode(selectedCategoryId);
     await fetchAllWordsForEdit(currentUser);
 
-    let activeWords = allWordsList.filter(w => w.currentStatus !== 'archived' && w.kanji_level?.startsWith('v2_'));
+    let activeWords = allWordsList.filter(w => w.currentStatus !== 'archived' && w.kanji_level === selectedCategoryId);
+
     const reviewCandidates = activeWords.filter(w => w.mistakeCount > 0 && w.currentStatus !== 'gold');
     const newCandidates = activeWords.filter(w => w.currentStatus === 'learning' || !w.currentStatus);
 
@@ -140,7 +141,7 @@ export default function Home() {
     const queue = [...reviewQueue, ...newQueue].sort(() => 0.5 - Math.random());
 
     if (queue.length === 0) {
-      alert("出題できる問題がありません！保護者メニューから新しい漢字を追加してください。");
+      alert("このジャンルで出題できる問題がありません！保護者メニューから問題を追加するか、別のジャンルを選んでください。");
       setLoading(false);
       return;
     }
@@ -158,10 +159,12 @@ export default function Home() {
     const today = getTodayJST();
     const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).maybeSingle();
 
+    const categoryName = CATEGORIES.find(c => c.id === mode)?.name.replace('【新】', '') || 'ドリル';
+
     const nEntry = {
       time: getJSTTimeString(),
       word: cur.kanji,
-      mode: MODE_NAMES[mode] || 'ドリル',
+      mode: categoryName,
       result: isCorrect ? 'correct' : 'incorrect',
       timeSpent: timeSpent,
       taskType: (cur as any).taskType || 'new'
@@ -214,6 +217,23 @@ export default function Home() {
         setCurrentIndex(nextIdx);
     }
     setIsProcessing(false);
+  };
+
+  const handleWordViewed = async (word: any, timeSpent: number, modeName: string) => {
+    if (timeSpent <= 0) return;
+    const today = getTodayJST();
+    const { data: cLog } = await supabase.from('daily_logs').select('*').eq('user_id', currentUser.id).eq('date', today).maybeSingle();
+
+    const nEntry = { time: getJSTTimeString(), word: word.kanji, mode: modeName, result: 'done', timeSpent: timeSpent, taskType: 'review' };
+    const nT = (cLog?.study_time_seconds || 0) + timeSpent;
+    const lD = { details: [...(cLog?.details || []), nEntry], study_time_seconds: nT };
+
+    if (cLog) {
+      await supabase.from('daily_logs').update(lD).eq('id', cLog.id);
+    } else {
+      await supabase.from('daily_logs').insert([{ user_id: currentUser.id, date: today, count: 0, is_completed: false, streak: 0, ...lD }]);
+    }
+    setDailyProgress((prev: any) => ({ ...prev, date: today, ...lD }));
   };
 
   const startDrawing = useCallback((e: React.PointerEvent) => {
@@ -286,6 +306,7 @@ export default function Home() {
     setLoading(false);
   }, [calendarDate, fetchMonthlyLogs, getFullReading]);
 
+  // ★変更：カレンダーの日付を押した時の動きを修正（保護者メニューにいる時は画面移動しない）
   const renderCalendar = useCallback(() => {
     const y = calendarDate.getFullYear(); const m = calendarDate.getMonth();
     const daysInMonth = new Date(y, m + 1, 0).getDate(); const firstDay = new Date(y, m, 1).getDay();
@@ -298,7 +319,9 @@ export default function Home() {
         
         const handleDateClick = () => {
           setSelectedLogDate(dateStr);
-          navTo('notebook');
+          if (view !== 'admin') {
+            navTo('notebook');
+          }
         };
 
         dayCells.push(
@@ -321,10 +344,15 @@ export default function Home() {
             </div>
         </div>
     );
-  }, [calendarDate, monthlyLogs, navTo]);
+  }, [calendarDate, monthlyLogs, navTo, view]);
 
   if (view === 'menu') return <MenuScreen {...{currentUser, setCurrentUser, dailyProgress, startGame, setView: navTo, renderCalendar, stopSpeaking, fetchAdminStats, setAdminTargetUser}} />;
-  if (view === 'game') return <PracticeScreen {...{currentUser, questQueue, currentIndex, canvasRef, startDrawing, draw, stopDrawing, clearCanvas, handleSelfJudge, renderReading, speakWord, getFullReading, setView: navTo}} />;
+  if (view === 'game') return (
+    <div className="relative h-screen flex flex-col font-sans">
+      <FloatingTimer />
+      <PracticeScreen {...{currentUser, questQueue, currentIndex, canvasRef, startDrawing, draw, stopDrawing, clearCanvas, handleSelfJudge, renderReading, speakWord, getFullReading, setView: navTo}} />
+    </div>
+  );
   
   if (view === 'notebook') {
     const isToday = !selectedLogDate || selectedLogDate === getTodayJST();
@@ -333,9 +361,9 @@ export default function Home() {
     return <NotebookScreen {...{currentUser, logData: targetLog, displayDate, setView: navTo}} />;
   }
 
-  if (view === 'dictionary') return <DictionaryScreen {...{currentUser, allWordsList, setView: navTo, toggleMyNoteStatus, renderReading, speakWord, getFullReading}} />;
-  if (view === 'weak_note') return <WeakNoteScreen {...{currentUser, allWordsList, setView: navTo, toggleMyNoteStatus, renderReading, speakWord, getFullReading}} />;
-  if (view === 'my_note') return <MyNoteScreen {...{currentUser, allWordsList, setView: navTo, toggleMyNoteStatus, renderReading, speakWord, getFullReading}} />;
+  if (view === 'dictionary') return <DictionaryScreen {...{currentUser, allWordsList, setView: navTo, toggleMyNoteStatus, renderReading, speakWord, getFullReading, onWordViewed: (w:any, t:number) => handleWordViewed(w, t, '漢字辞書')}} />;
+  if (view === 'weak_note') return <WeakNoteScreen {...{currentUser, allWordsList, setView: navTo, toggleMyNoteStatus, renderReading, speakWord, getFullReading, onWordViewed: (w:any, t:number) => handleWordViewed(w, t, '苦手ノート')}} />;
+  if (view === 'my_note') return <MyNoteScreen {...{currentUser, allWordsList, setView: navTo, toggleMyNoteStatus, renderReading, speakWord, getFullReading, onWordViewed: (w:any, t:number) => handleWordViewed(w, t, '自分ノート')}} />;
   
   if (view === 'admin') return <AdminScreen {...{currentUser, setView: navTo, adminTargetUser, setAdminTargetUser, fetchAdminStats, fetchAllWordsForEdit, stats, challengeSettings: {} as any, setChallengeSettings: ()=>{}, saveChallengeSettings: () => {}, sendLineToChild: () => {}, editStreak, setEditStreak, handleSaveStreak: () => {}, handleAddWord: () => {}, handleUpdateWord: () => {}, allWordsList, toggleMasterStatus: () => {}, handleDeleteWord: () => {}, monthlyLogs, selectedLogDate, setSelectedLogDate, renderCalendar}} />;
 

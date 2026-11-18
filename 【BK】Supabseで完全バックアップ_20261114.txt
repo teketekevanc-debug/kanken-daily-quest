@@ -4,3 +4,13 @@ Kanken-daily-quest
 postgresql://postgres:o7G0mbAflqvL0RF1@db.aatwrkfviprkvjgvjqqa.supabase.co:5432/postgres
 
 プロジェクトパスワード
+
+
+
+
+4.バックアップコマンドを実行する:PowerShellで実行。VS Codeなどのターミナル（PowerShell）を開き、組み立てたURLを使って2つのコマンドを順番に実行します。
+構造のバックアップ：PowerShellnpx supabase db dump --db-url "書き換えたURL" -f supabase_schema.sql
+
+データのバックアップ：PowerShellnpx supabase db dump --db-url "書き換えたURL" --data-only -f supabase_data.sql
+
+無事に supabase_schema.sql と supabase_data.sql の2つのファイルがプロジェクトフォルダ内にできたらバックアップ完了です。
